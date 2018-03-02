@@ -1,36 +1,27 @@
-# Java_MCS_algorithms
+Java_MCS_algorithms
 ===========
-PhD project work with Sheffield University.  Variety of MCS algorithms coded in Java
-
-The dataset
-===========
-
-Unzip the data
---------------
-The data has been compressed with 7zip. It can be unzipped with p7zip on Linux, or 7zip on Windows.
 
 Description
 -----------
-The benchmark data will be placed in the dataset subdirectories of the
-SingleAssay and MultiAssay directories. There are 1000 files corresponding
-to the 1000 repetitions. Each file contains several thousand lines of
-CHEMBL IDs, where the first ID is the reference molecule, and the other
-four are molecules are increasing distance (decreasing similarity) to the
-reference.
+PhD project work with Sheffield University.  Variety of Maximum Common Substructure (MCS) algorithms for use with chemical graphs/structures.  Coded in Java 1.6.
 
-How to reproduce the results
-============================
 
-Requirements
+
+Usage
+-----------
+Please compile using Eclipse IDE (I used Mars.2).  Usage examples revolve around the "ExtendedIsomorphism" class, in "MCSMethodsTest.java"
+
+
+Java Library Requirements
 ------------
-1. Python 2.7
-2. NumPy
-3. SciPy
-4. RDKit (2015.09.2)
+1. Chemistry Development Kit (CDK) 1.5 - molecule handling
+2. Ambit Core and SMARTS libraries (2.4.13) - fast SMARTS parsing and generation used in MCS representation
+3. Colt (1.0) - Eigenvector [calculations]
+4. Java-getopt (1.0.13) - command line options
+5. guava (18.0) - alternative list handling
+6. SMSD (2015 04 01) - additional graph theory tools and MCS handling
 
-Optional but needed to generate the graph depictions
+
+Author Information
 ----------------------------------------------------
-1. dot (provided by GraphViz)
-
-Get ChEMBL
-----------
+Dr Edmund Duesbury (eduece99 AT g mail DOT com)
