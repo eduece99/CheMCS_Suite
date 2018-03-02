@@ -1,0 +1,6 @@
+CC(CC1CC(C=C)CC2NCCC12)c1ccc(OC2CCCS2)cc1
+OCC(S)Nc1ccc(cc1)C1CC(CC)CC2NCCC12
+C(=S)NC1=CC=C(C=C1C)C2CCCC3NC=CC23
+
+ 3 molecules to test the VFLib algorithm that I modified to find the dMCES, as opposed to the cMCES
+

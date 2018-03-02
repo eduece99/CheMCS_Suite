@@ -1,0 +1,3 @@
+Cc1cccc(NC(=O)NC2N=C(c3ccccc3)c3ccccc3N(CC(=O)N3CCCC3)C2=O)c1
+COc1ccccc1N(Cc1ccccc1)C(=O)C(CCC(O)=O)NC(=O)c1cc2ccccc2[nH]1
+ Example posed in the RASCAL paper for MCS finding

@@ -1,0 +1,2 @@
+COc1cc(C(=O)N2CCC3(C=C(C(=O)NS(N)(=O)=O)CC3)Cc4ccccc24)ccc1NC(=O)c5cc(F)ccc5Cl
+CC(C)CC(C(=O)NCc1cccc(C(F)(F)F)c1)N2C(=O)C(N3C(=O)OCC3c4ccccc4)C2C=Cc5ccccc5 causes issues with VFLIBMCS

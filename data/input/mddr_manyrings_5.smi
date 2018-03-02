@@ -1,0 +1,7 @@
+O=C1C2C(C(=O)N1CCCN1CC3C(C1)C1C=CC3C3CC31)C1c3ccccc3C2c2ccccc21
+c1ccc2c(c1)C1c3ccccc3C2C2CN(CCCN3CC4C(C3)C3C=CC4C4CCC43)CC21
+c1ccc2c(c1)c1cc[n+]2Cc2cccc(c2)C[n+]2ccc(c3ccccc32)NCc2ccc(cc2)CN1
+O=C1C2CC(C(=O)N1CCCCN1CCN(c3ccc4ccccc4n3)CC1)C1C3C4C5CC3C(C54)C21
+Oc1ccc2c(O)c(CNC34CC5CC(CC(C5)C3)C4)ccc2c1CNC12CC3CC(CC(C3)C1)C2
+ 
+ 5 compounds from the mddr.sdf dataset with molecular weight less than 500, and as many rings as possible in that constraint
