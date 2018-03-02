@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+Bundle-SymbolicName: org.cisrg.matching.source
+Bundle-Version: 1.0.0
+Bundle-Name: %pluginName
+Bundle-Localization: plugin
+Bundle-ManifestVersion: 2
+Eclipse-SourceBundle: org.cisrg.matching;version="1.0.0"
+

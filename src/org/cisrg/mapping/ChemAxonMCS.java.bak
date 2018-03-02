@@ -1,0 +1,1279 @@
+package org.cisrg.mapping;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringBufferInputStream;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.apache.xmlbeans.impl.piccolo.io.FileFormatException;
+import org.cisrg.ambit.SmartsHelper;
+import org.cisrg.ambit.SmartsParser;
+import org.cisrg.knime.ExtendedAlgorithm;
+import org.cisrg.knime.ExtendedIsomorphism;
+import org.knime.cisrg.hyperstructures.CDKSMARTSHyperstructureFitness;
+import org.knime.cisrg.hyperstructures.ChemAxonSMARTSHyperstructureFitness;
+import org.knime.cisrg.hyperstructures.MCSFitness;
+import org.knime.cisrg.hyperstructures.MDLV2000WriterQueries;
+import org.knime.cisrg.hyperstructures.mapping.old.ZhuGraphMatching;
+import org.openscience.cdk.Atom;
+import org.openscience.cdk.Bond;
+import org.openscience.cdk.CDKConstants;
+import org.openscience.cdk.DefaultChemObjectBuilder;
+import org.openscience.cdk.exception.CDKException;
+import org.openscience.cdk.exception.InvalidSmilesException;
+import org.openscience.cdk.graph.matrix.AdjacencyMatrix;
+import org.openscience.cdk.interfaces.IAtom;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.IBond;
+import org.openscience.cdk.interfaces.IBond.Order;
+import org.openscience.cdk.io.CMLWriter;
+import org.openscience.cdk.io.MDLV2000Reader;
+import org.openscience.cdk.io.MDLV2000Writer;
+import org.openscience.cdk.io.Mol2Writer;
+import org.openscience.cdk.io.setting.BooleanIOSetting;
+import org.openscience.cdk.isomorphism.UniversalIsomorphismTester;
+import org.openscience.cdk.isomorphism.matchers.IQueryAtomContainer;
+import org.openscience.cdk.isomorphism.matchers.IQueryBond;
+import org.openscience.cdk.isomorphism.matchers.QueryAtomContainer;
+import org.openscience.cdk.isomorphism.matchers.QueryAtomContainerCreator;
+import org.openscience.cdk.silent.AtomContainer;
+import org.openscience.cdk.smiles.SmilesGenerator;
+import org.openscience.cdk.smiles.SmilesParser;
+//import org.openscience.cdk.smiles.smarts.parser.SMARTSParser;
+import org.openscience.cdk.smsd.Isomorphism;
+import org.openscience.cdk.smsd.interfaces.Algorithm;
+
+//import ambit2.smarts.SmartsHelper;
+import ambit2.smarts.CMLUtilities;
+import cern.colt.function.DoubleFunction;
+import cern.colt.matrix.DoubleMatrix2D;
+import cern.colt.matrix.impl.DenseDoubleMatrix2D;
+import cern.jet.math.Functions;
+
+import chemaxon.core.calculations.RingSearch;
+import chemaxon.formats.MolExporter;
+import chemaxon.formats.MolImporter;
+import chemaxon.marvin.io.MolExportException;
+import chemaxon.struc.MolAtom;
+import chemaxon.struc.MolBond;
+import chemaxon.struc.Molecule;
+import chemaxon.struc.MoleculeGraph;
+import chemaxon.struc.QueryBond;
+import chemaxon.struc.SelectionMolecule;
+import chemaxon.struc.gearch.MoleculeGearch;
+
+import com.chemaxon.search.CustomMatcher;
+import com.chemaxon.search.CustomMatcherFactory;
+import com.chemaxon.search.mcs.MaxCommonSubstructure;
+import com.chemaxon.search.mcs.McsSearchOptions;
+import com.chemaxon.search.mcs.McsSearchResult;
+import com.chemaxon.search.mcs.RingHandlingMode;
+import com.chemaxon.search.mcs.SearchMode;
+
+
+
+
+public class ChemAxonMCS extends MCSMethods {
+	
+	
+	public ChemAxonMCS(IAtomContainer h, IAtomContainer q, boolean matchBonds, boolean connectedMode, boolean ringEnforcement) {
+		hsMol = h;
+		qMol = q;
+		
+		options = new ChemAxonMCSOptions();
+		options.matchBonds = matchBonds;
+		options.connectedMode = connectedMode;
+		options.ringEnforcement = ringEnforcement;
+	}
+	
+	public ChemAxonMCS(IAtomContainer h, IAtomContainer q, ChemAxonMCSOptions opts) {
+		hsMol = h;
+		qMol = q;
+
+		options = opts;
+	}
+	
+	public static class ChemAxonMCSOptions {
+		
+		public boolean matchBonds = true;
+		public boolean matchAtoms = true;
+		public boolean connectedMode = false;
+		public boolean ringEnforcement = false;
+		public boolean SMARTSHandling = true;
+		public boolean bondFrequencies = false;
+		public boolean verbose = false;
+		
+		
+	}
+	
+	
+	
+	
+	private static double[] getDegreeList( IAtomContainer g ) {
+		double[] degreesN1 = new double[ g.getAtomCount() ];
+		for( int n1 = 0; n1 < g.getAtomCount(); n1++ ) {
+			degreesN1[n1] = ( g.getConnectedBondsCount( g.getAtom(n1) ) );
+		}
+		
+		return degreesN1;
+	}
+	
+	private static double[] getDegreeList( Molecule g ) {
+		double[] degreesN1 = new double[ g.getAtomCount() ];
+		for( int n1 = 0; n1 < g.getAtomCount(); n1++ ) {
+			degreesN1[n1] = g.getAtom(n1).getBondCount();
+		}
+		
+		return degreesN1;
+	}
+	
+	private static McsSearchResult findMCS( Molecule cmol1, Molecule cmol2, ChemAxonMCSOptions options ) {
+		//String queryString = null, targetString = null;
+		//SmilesGenerator smiG = new SmilesGenerator(true);
+		//SMARTSGenerator smaG = new SMARTSGenerator(true);
+		
+		//SmartsHelper smaH = new SmartsHelper(DefaultChemObjectBuilder.getInstance());
+		McsSearchResult result = null;
+		
+		final int[][] atomToRingIdx = cmol2.getSSSRIdxesForAtoms();
+		
+		
+		// This is annoying, but if this SmartsParser isn't made locally, then concurrency errors can occur (instead of making it a static object)
+		final SmartsParser smaPThreadSafe = new SmartsParser();
+		
+
+		try {
+			
+			McsSearchOptions.Builder mcsOptsB = new McsSearchOptions.Builder();
+			//options.matchBonds = false;
+ 
+			//System.out.println("Bonds matching: " + options.matchBonds );
+			mcsOptsB.bondTypeMatching(options.matchBonds);
+			mcsOptsB.atomTypeMatching(options.matchAtoms);
+			mcsOptsB.connectedMode(options.connectedMode);
+			
+			
+			
+			//if( ! matchBonds )
+				mcsOptsB.ringHandlingMode( RingHandlingMode.IGNORE );
+			
+			
+			if( options.ringEnforcement && options.matchBonds ) {	
+				mcsOptsB.customMatching( new CustomMatcherFactory() {
+				
+					@Override
+					public CustomMatcher create(final Molecule hsMol, final Molecule dbMol) {
+						// TODO Auto-generated method stub
+						return new CustomMatcher() {
+							
+							@Override
+							// use the SMARTS code in the bond
+							public boolean match(MolBond hsBond, MolBond dbBond) {
+								
+								if( hsBond instanceof QueryBond ) {
+									QueryBond hsqBond = (QueryBond) hsBond;
+									
+									String queryBondSMARTS = hsqBond.getAtom1().getSymbol() + hsqBond.getQuerystr() + hsqBond.getAtom2().getSymbol();
+									//System.err.println( "qABond = " + queryBondSMARTS );
+									IQueryBond cdkHsqBond = (IQueryBond) smaPThreadSafe.parse( queryBondSMARTS ).getBond(0);
+									
+									if( cdkHsqBond == null ) 
+										System.err.println("WARNING - hs bond is null");
+									
+									
+									int atom1Index = dbMol.indexOf(dbBond.getAtom1());
+									int atom2Index = dbMol.indexOf(dbBond.getAtom2());
+									
+									IBond cdkDbBond = new Bond();
+									cdkDbBond.setAtom( new Atom( dbBond.getAtom1().getSymbol() ), 0);
+									cdkDbBond.setAtom( new Atom( dbBond.getAtom2().getSymbol() ), 1);
+									
+									switch( dbBond.getType() ) {
+										case 1:
+											cdkDbBond.setOrder( Order.SINGLE );
+											break;
+										case 2:
+											cdkDbBond.setOrder( Order.DOUBLE );
+											break;
+										case 3:
+											cdkDbBond.setOrder( Order.TRIPLE );
+											break;
+										case MolBond.AROMATIC:  // aromatic
+											cdkDbBond.setOrder( Order.SINGLE );
+											cdkDbBond.setFlag( CDKConstants.ISAROMATIC , true );
+											break;
+										default:
+											System.err.println("WARNING - db bond has no order");
+											//throw new CDKException( "WARNING - db bond has no order" );
+									}
+									
+									
+									//if( hsBond.getFlags() & MolBond.TOPOLOGY_RING ) {
+										
+									//}
+									
+									if( dbMol.isRingBond( dbMol.indexOf(dbBond) ) ) {
+										cdkDbBond.setFlag(CDKConstants.ISINRING, true);
+										
+										cdkDbBond.getAtom(0).setProperty( CMLUtilities.RingData2, atomToRingIdx[atom1Index] );
+										cdkDbBond.getAtom(1).setProperty( CMLUtilities.RingData2, atomToRingIdx[atom2Index] );
+									}
+									
+									//System.err.println( cdkDbBond.getAtom(0).getSymbol() + cdkDbBond.getAtom(1).getSymbol() + " " + cdkDbBond.getFlag(CDKConstants.ISINRING) + " " + cdkHsqBond.matches( cdkDbBond ) );
+									//System.err.println( "non hs Bond = " + cdkDbBond.getAtom(0).getSymbol() + " " + cdkDbBond.getOrder().name() + " " + cdkDbBond.getAtom(1).getSymbol()  );
+									
+									
+									return cdkHsqBond.matches( cdkDbBond );
+									//return true;
+								} 
+								
+								return true;
+							}
+							
+							// It's bonds we're concerned about so we'll make no changes to atom matching
+							@Override
+							public boolean match(MolAtom arg0, MolAtom arg1) {
+								// TODO Auto-generated method stub
+								return true;
+							}
+						};
+					}
+				} );
+			}
+			
+			MaxCommonSubstructure mcs = MaxCommonSubstructure.newInstance( mcsOptsB.build() );
+			//mcs.setTimeLimit(2);
+			mcs.setSearchMode(SearchMode.NORMAL);
+			
+			/*
+			if( cmol2.getBondCount() > 60 ) {
+				System.out.println("WARNING - database molecule too big - using faster search heuristic!");
+				mcs.setSearchMode(SearchMode.FAST);
+			}
+			*/
+			//mcs.getSearchOptions( McsSearchOptions.Builder )
+			mcs.setMolecules(cmol1, cmol2);
+			//mcs.setTimeLimit(10);
+			result = mcs.nextResult();
+			 
+			
+			
+			if(options.verbose) {
+				int upperBound = mcs.calculateUpperBound();
+				System.out.println("Atoms in query: " + cmol1.getAtomCount() );  // the hyperstructure
+				System.out.println("Atoms in target: " + cmol2.getAtomCount() );
+				System.out.println("Bonds in query: " + cmol1.getBondCount() );
+				System.out.println("Bonds in target: " + cmol2.getBondCount() );
+				System.out.println("upper bound bonds: " + upperBound );
+				System.out.println("Atoms in MCS: " + result.getAtomCount());
+				System.out.println("Bonds in MCS: " + result.getBondCount());
+				System.out.println("MCS molecule: " + MolExporter.exportToFormat(result.getAsMolecule(), "cxsmarts"));
+				System.out.println("Bonds matching: " + options.matchBonds );
+				System.out.println("Time Limit: " + mcs.getTimeLimit() );
+				
+			}
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return result;
+	}
+	
+	
+	public static Molecule CDKToChemAxon( IAtomContainer CDKMol, boolean SMARTSHandling ) {
+		Molecule cmol = null;
+		
+		if( ! SMARTSHandling ) {
+			StringWriter sdfStrings = new StringWriter(6000);
+			MDLV2000WriterQueries moleculeToSdf = new MDLV2000WriterQueries( sdfStrings );
+			/*
+			moleculeToSdf.addSetting(new BooleanIOSetting(
+            "WriteAromaticBondTypes",
+            BooleanIOSetting.Importance.HIGH,
+            "Should aromatic bonds be written as bond type 4?",
+            "true"
+			));
+			*/
+			try {
+				//moleculeToSdf.writeMolecule(query);
+				//moleculeToSdf.writeMolecule(target);
+				
+				moleculeToSdf.write(CDKMol);
+				//System.out.println( new SmartsHelper( DefaultChemObjectBuilder.getInstance() ).toSmarts( (QueryAtomContainer) CDKMol ) );
+				moleculeToSdf.close();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		
+			try {
+				MolImporter mim = new MolImporter( new StringBufferInputStream( sdfStrings.getBuffer().toString() ) );
+				cmol = mim.read();
+				cmol.aromatize();
+			} catch (IOException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+		} else {
+			//System.err.println( "reading SMILES..." );
+			
+			
+			String molLine = null;
+			MolImporter mim = null;
+			
+			// SMARTS or SMILES strings for molecule representation?
+			try {
+				if( CDKMol instanceof IQueryAtomContainer ) {
+					SmartsHelper smaH = new SmartsHelper( DefaultChemObjectBuilder.getInstance() );
+					molLine = smaH.toSmarts( (QueryAtomContainer) CDKMol);
+					molLine = molLine.replaceAll("\\|.*?\\|", "");  // remove bond frequency info
+					//System.out.println( "molLine = " + molLine );
+					mim = new MolImporter( new StringBufferInputStream( molLine ), "cxsmarts" );
+				} else {
+					SmilesGenerator smiG = new SmilesGenerator().aromatic();
+					molLine = smiG.create(CDKMol);
+					//System.out.println("CDKMol = " + CDKMol);
+					mim = new MolImporter( new StringBufferInputStream( molLine ), "smiles" );
+				}
+			} catch (CDKException e) {
+				// TODO Auto-generated catch block
+				System.err.println("Invalid Molecule - cannot create SMILES from query");
+				e.printStackTrace();
+			} catch (IOException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+			
+			
+			
+			try {
+				cmol = mim.read();
+			} catch (IOException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+			//System.err.println( "finished reading SMILES in ChemAxon" );
+		}
+		
+		
+		// As the CDK SMARTS parser doesn't support the % sign in rings this workaround is needed
+		/*
+		org.openscience.cdk.ringsearch.RingSearch rs = new org.openscience.cdk.ringsearch.RingSearch(CDKMol);
+		int ringCount = ConvenienceTools.countRings(CDKMol);
+		
+		if( ringCount > 9 ) {
+			StringWriter sdfStrings = new StringWriter(6000);
+			MDLV2000Writer moleculeToSdf = new MDLV2000Writer( sdfStrings );
+			try {
+				moleculeToSdf.writeMolecule(CDKMol);
+				moleculeToSdf.close();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			try {
+				MolImporter mim = new MolImporter( new StringBufferInputStream( sdfStrings.getBuffer().toString() ) );
+				cmol = mim.read();
+			} catch (IOException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+		}
+		*/
+		return cmol;
+	}
+	
+	
+	public static McsSearchResult calculateMappingResult( Molecule cmol1, Molecule cmol2, ChemAxonMCSOptions options ) {
+		
+		//McsSearchResult result = null;
+		//String queryString = null, targetString = null;
+		
+		
+		
+		if( cmol2 == null ) {
+			System.err.println("WARNING - target molecule is " + cmol2 + " !  MCS will be null! ");
+		}
+		
+		//System.out.println( "cmol2 - " + targetString );
+		
+			//cmol2.aromatize( MoleculeGraph.AROM_GENERAL );
+		
+		if( options.verbose ) {
+			try {
+				MolExporter mex = new MolExporter( System.out, "cxsmarts" );
+				
+				System.out.print("cmol1 = ");
+				mex.write(cmol1);
+				System.out.print(" | cmol1 \n");
+				
+				mex = new MolExporter(System.out, "smiles" );
+				
+				System.out.print("cmol2 = ");
+				mex.write(cmol2);
+				System.out.print(" | cmol2 \n");
+			} catch (MolExportException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			} catch (IllegalArgumentException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			} catch (IOException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+		}
+		//cmol1.dearomatize();
+		//cmol2.dearomatize();
+		cmol1.aromatize();
+		cmol2.aromatize();
+		
+		
+		return findMCS( cmol1, cmol2, options );
+		
+	}
+	
+	
+	
+	public static ArrayList<Integer> calculateAtomMapping( IAtomContainer query, IAtomContainer target, Molecule cmol1, Molecule cmol2, 
+			McsSearchResult result, ChemAxonMCSOptions options ) {
+	
+		ArrayList<Integer> chrMapping = null;
+		List<Integer> qMatched = result.getMatchedQueryAtoms();
+		List<Integer> tMatched = result.getMatchedTargetAtoms();
+			
+		if( options.verbose ) {
+			System.out.println("query atoms: " + qMatched );
+			System.out.println("target atoms: " + tMatched );
+		}
+		
+			
+			/*
+			SmilesParser sp = new SmilesParser( DefaultChemObjectBuilder.getInstance() );
+			SmartsParser smp = new SmartsParser();
+			IAtomContainer qMol = null, tMol = null;
+			try {
+				String qSMILES = null;
+				
+				if( query instanceof IQueryAtomContainer ) {
+					qSMILES = MolExporter.exportToFormat( cmol1, "smarts") ;
+					System.out.println( "SMARTS: " + qSMILES );
+					qMol = smp.parse( qSMILES ); 
+					ConvenienceTools.initializeQuery( (IQueryAtomContainer) qMol);
+				} else {
+					qSMILES = MolExporter.exportToFormat( cmol1, "smiles") ;
+					qMol = sp.parseSmiles(qSMILES);
+				}
+				
+				String tSMILES = MolExporter.exportToFormat( cmol2, "smiles") ;
+				
+				tMol = sp.parseSmiles( tSMILES );
+			} catch (InvalidSmilesException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			
+			for( int n = 0; n < qMol.getAtomCount(); n++ ) {
+				System.out.print( n + "=" + qMol.getAtom(n).getSymbol() + ", " );
+			}
+			System.out.println();
+			for( int n = 0; n < tMol.getAtomCount(); n++ ) {
+				System.out.print( n + "=" + tMol.getAtom(n).getSymbol() + ", " );
+			}
+			System.out.println();
+			*/
+			
+		boolean SMARTSHandling = false;
+			if( SMARTSHandling ) {
+			
+				DoubleFunction simplifier = new DoubleFunction() {
+	
+					public double apply(double arg0) {
+						return arg0 > 0 ? 1 : 0;
+					}
+				};
+				
+				String cmol1Sdf = null, cmol2Sdf = null;
+				try {
+					cmol1Sdf = MolExporter.exportToFormat(cmol1, "sdf");
+					cmol2Sdf = MolExporter.exportToFormat(cmol2, "sdf");
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				
+				
+				
+				MDLV2000Reader mdlr1 = new MDLV2000Reader( new StringBufferInputStream(cmol1Sdf) );
+				MDLV2000Reader mdlr2 = new MDLV2000Reader( new StringBufferInputStream(cmol2Sdf) );
+				IAtomContainer queryMol = null, targetMol = null;
+				try {
+					queryMol = mdlr1.read( new AtomContainer()  );
+					targetMol = mdlr2.read( new AtomContainer() );
+					ConvenienceTools.initializeMolecule(queryMol);
+				} catch (CDKException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				/*
+				int[][] cmol1Adj = cmol1.getBtab();
+				int[][] cmol2Adj = cmol2.getBtab();
+				DenseDoubleMatrix2D cmol1Adj2 = new DenseDoubleMatrix2D( ConvenienceTools.int2DtoDouble2D( cmol1Adj ) );
+				DenseDoubleMatrix2D cmol2Adj2 = new DenseDoubleMatrix2D( ConvenienceTools.int2DtoDouble2D( cmol2Adj ) );
+				cmol1Adj2.assign( simplifier );
+				cmol2Adj2.assign( simplifier );
+				
+				
+				DenseDoubleMatrix2D g1AdjMat = new DenseDoubleMatrix2D( ConvenienceTools.int2DtoDouble2D( AdjacencyMatrix.getMatrix(query) ) );
+				DenseDoubleMatrix2D g2AdjMat = new DenseDoubleMatrix2D( ConvenienceTools.int2DtoDouble2D( AdjacencyMatrix.getMatrix(target) ) );
+				*/
+				
+				//DoubleMatrix2D translationMat1G = ZhuGraphMatching.globalSimilarity(cmol1Adj2, g1AdjMat, getDegreeList(cmol1), getDegreeList(query));
+				DoubleMatrix2D translationMat1G = ZhuGraphMatching.globalSimilarity(queryMol, query);
+				DoubleMatrix2D translationMat2G = ZhuGraphMatching.globalSimilarity(targetMol, target);
+				
+				ZhuGraphMatching.assignLabels( queryMol );
+				ZhuGraphMatching.assignLabels( targetMol );
+				ZhuGraphMatching.assignLabels( query );
+				ZhuGraphMatching.assignLabels( target );
+				DoubleMatrix2D translationMat1L = ZhuGraphMatching.localPathSimilarity(queryMol, query, 2, true);
+				DoubleMatrix2D translationMat2L = ZhuGraphMatching.localPathSimilarity(targetMol, target, 2, true);
+				
+				DoubleMatrix2D finalSim1 = translationMat1G.copy().assign( translationMat1L, Functions.mult );
+				finalSim1.assign( Functions.sqrt );
+				
+				DoubleMatrix2D finalSim2 = translationMat2G.copy().assign( translationMat2L, Functions.mult );
+				finalSim2.assign( Functions.sqrt );
+				
+				/*
+				for( int i = 0; i < cmol1.getAtomCount(); i++ ) {
+					for( int j = 0; j < cmol1.getAtomCount(); j++ ) {
+						if( cmol1.getAtom(i).getAtno() != query.getAtom(j).getAtomicNumber() )
+							translationMat1.set(i, j, 0);
+					}
+				}
+				
+				for( int i = 0; i < cmol2.getAtomCount(); i++ ) {
+					for( int j = 0; j < cmol2.getAtomCount(); j++ ) {
+						if( cmol2.getAtom(i).getAtno() != target.getAtom(j).getAtomicNumber() )
+							translationMat2.set(i, j, 0);
+					}
+				}
+				*/
+				ArrayList<ArrayList<Integer>> translation1 = ZhuGraphMatching.similarityMatchList(finalSim1);
+				ArrayList<ArrayList<Integer>> translation2 = ZhuGraphMatching.similarityMatchList(finalSim2);
+				
+				if( options.verbose ) {
+					System.out.println( translationMat2L );
+					System.out.println( translation1 );
+					System.out.println( translation2 );
+				}
+				/*
+				VFlibMCSHandler vfmcs = new VFlibMCSHandler(false);
+				vfmcs.set( (IQueryAtomContainer) query, queryMol);
+				vfmcs.searchMCS(false);
+				*/
+				Isomorphism mapper = new Isomorphism(Algorithm.VFLibMCS, true);
+				try {
+					mapper.init(query, queryMol, false, false);
+				} catch (CDKException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				Map<Integer,Integer> translationvf1 = new HashMap<Integer,Integer>( mapper.getFirstMapping() );
+				
+				try {
+					mapper.init(target, targetMol, false, false);
+				} catch (CDKException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				Map<Integer,Integer> translationvf2 = mapper.getFirstMapping();
+				
+				
+				ArrayList<Integer> mapping1 = new ArrayList<Integer>( cmol1.getAtomCount() );
+				for( int n = 0; n < cmol1.getAtomCount(); n++ ) {
+					mapping1.add( (n * -1) - 1 );
+				}
+					
+				for( int n = 0; n < cmol1.getAtomCount(); n++ ) {
+					if( translationvf1.containsKey(n) )
+						mapping1.set( n, translationvf1.get( n ) );
+				}
+				MCSFitness hf3 = new MCSFitness( query, queryMol );
+				
+				if( options.verbose )
+					System.out.println( "mapping fitness1 - " + mapping1 + hf3.fitness(mapping1));
+				
+				
+				
+				
+				
+				ArrayList<Integer> mapping2 = new ArrayList<Integer>( cmol2.getAtomCount() );
+				for( int n = 0; n < cmol2.getAtomCount(); n++ ) {
+					mapping2.add( (n * -1) - 1 );
+				}
+				for( int n = 0; n < cmol2.getAtomCount(); n++ ) {
+					if( translationvf2.containsKey(n) )
+						mapping2.set( n, translationvf2.get( n ) );
+				}
+				/*
+				for( int n = 0; n < cmol2.getAtomCount(); n++ ) {
+					mapping2.set( translation2.get( n ).get(0), translation2.get( n ).get(1) );
+				}
+				*/
+				MCSFitness hf4 = new MCSFitness( target, targetMol );
+				
+				if( options.verbose )
+					System.out.println( "mapping fitness2 - " + mapping2 + hf4.fitness(mapping2));
+				
+				
+				
+				
+				chrMapping = new ArrayList<Integer>( cmol2.getAtomCount() );
+					
+				for( int n = 0; n < cmol2.getAtomCount(); n++ ) {
+						chrMapping.add( (n * -1) - 1 );
+				}
+					
+				for( int n = 0; n < result.getAtomCount(); n++ ) {
+					int qIndex = translation1.get( qMatched.get(n) ).get(1);
+					int tIndex = translation2.get( tMatched.get(n) ).get(1);
+					chrMapping.set( tIndex, qIndex );
+				}
+				
+				if( options.verbose ) {
+					for( int n = 0; n < cmol1.getAtomCount(); n++ ) {
+						System.out.print( n + "=" + cmol1.getAtom(n).getSymbol() + ", " );
+					}
+					System.out.println();
+					for( int n = 0; n < cmol2.getAtomCount(); n++ ) {
+						System.out.print( n + "=" + cmol2.getAtom(n).getSymbol() + ", " );
+					}
+					System.out.println();
+				}
+				
+				/*
+				ChemAxonSMARTSHyperstructureFitness hsCreator = new ChemAxonSMARTSHyperstructureFitness(cmol2, cmol1);
+				Molecule newHs = hsCreator.createHyperstructure(result);
+				
+				try {
+					System.out.println("new hs - " + MolExporter.exportToFormat( newHs, "smarts") );
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				*/
+			} else {
+				chrMapping = new ArrayList<Integer>( cmol1.getAtomCount() );  // size of SMARTS molecule/hyperstructure
+				
+				for( int n = 0; n < cmol1.getAtomCount(); n++ ) {
+						chrMapping.add( (n * -1) - 1 );  // dummy assignments
+				}
+				//System.out.println( cmol1.getAtomCount() + " " + cmol2.getAtomCount() );
+				for( int n = 0; n < result.getAtomCount(); n++ ) {
+					int qIndex = qMatched.get(n);
+					int tIndex = tMatched.get(n);
+					chrMapping.set( qIndex, tIndex );
+				}
+				
+				
+				
+				SelectionMolecule[] fragments = result.getAsMolecule().findFrags();
+				int[] fragmentSizes = new int[ fragments.length ];
+				for( int f = 0; f < fragments.length; f++ ) {
+					fragmentSizes[f] = fragments[f].getBondCount();
+				}
+				
+				
+				query.setProperty(mcsSizeParam, result.getBondCount() );
+				query.setProperty(fragmentsParam, fragmentSizes );
+				try {
+					query.setProperty(mcsResult, MolExporter.exportToFormat(result.getAsMolecule(), "smarts") );
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
+		
+	
+		return chrMapping;
+		
+	}
+	
+	// target can be the hyperstructure
+	public Map<IBond, IBond> calculateBondMapping( IAtomContainer target, IAtomContainer query, McsSearchResult result, ChemAxonMCSOptions options ) {
+		
+		//ArrayList<Integer> chrMapping = null;
+		HashMap<IBond, IBond> bondMap = new HashMap<IBond, IBond>();
+		
+		List<Integer> qMatched = result.getMatchedQueryBonds();
+		List<Integer> tMatched = result.getMatchedTargetBonds();
+		
+		if( options.verbose ) {
+			System.out.println("query bonds: " + qMatched );
+			System.out.println("target bonds: " + tMatched );
+		}
+		
+		// slight hack - save bond indices here
+		List<int[]> bondIndexMapping = new ArrayList<int[]>( qMatched.size() );
+		
+		for( int n = 0; n < tMatched.size(); n++ ) {
+			bondMap.put( 
+					target.getBond( qMatched.get(n) ),
+					query.getBond( tMatched.get(n) )
+			);
+			
+			bondIndexMapping.add( new int[]{ qMatched.get(n), tMatched.get(n) } );
+		}
+		mcsBondIndexIsomorphisms.add( bondIndexMapping );
+		
+		
+		SelectionMolecule[] fragments = result.getAsMolecule().findFrags();
+		fragmentSizes = new int[ fragments.length ];
+		for( int f = 0; f < fragments.length; f++ ) {
+			fragmentSizes[f] = fragments[f].getAtomCount();
+		}
+		
+		
+		target.setProperty(mcsSizeParam, result.getBondCount() );
+		target.setProperty(fragmentsParam, fragmentSizes );
+		try {
+			target.setProperty(mcsResult, MolExporter.exportToFormat(result.getAsMolecule(), "smarts") );
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return bondMap;
+		
+	}
+	
+	
+	
+	
+	private static String createHyperstructureSMARTS( IAtomContainer query, IAtomContainer target ) {
+		
+		// SMARTS or SMILES strings for molecule representation?
+				String queryString = null, targetString = null;
+				SmilesGenerator smiG = new SmilesGenerator();
+				//SMARTSGenerator smaG = new SMARTSGenerator(true);
+				SmartsHelper smaH = new SmartsHelper( DefaultChemObjectBuilder.getInstance() );
+				McsSearchResult result = null;
+				Molecule cmol1 = null, cmol2 = null;
+				
+				if( query instanceof IQueryAtomContainer ) {
+					queryString = smaH.toSmarts( (QueryAtomContainer) query);
+				} else {
+					queryString = smiG.createSMILES(query);
+				}
+				
+				if( target instanceof IQueryAtomContainer ) {
+					targetString = smaH.toSmarts( (QueryAtomContainer) target);
+				} else {
+					targetString = smiG.createSMILES(target);
+				}
+				
+				
+				try {
+					MolImporter mim = new MolImporter( new StringBufferInputStream( queryString + "\n" + targetString ) );
+					cmol1 = mim.read();
+					cmol2 = mim.read();
+				} catch (IOException e2) {
+					// TODO Auto-generated catch block
+					e2.printStackTrace();
+				}
+				 
+				
+				ChemAxonMCSOptions mcsOpts = new ChemAxonMCSOptions();
+				mcsOpts.connectedMode = false;
+				mcsOpts.matchBonds = false;
+				mcsOpts.ringEnforcement = false;
+				mcsOpts.SMARTSHandling = true;
+				
+				result = findMCS(cmol1, cmol2, mcsOpts);
+				
+				ChemAxonSMARTSHyperstructureFitness hsCreator = new ChemAxonSMARTSHyperstructureFitness(cmol2, cmol1);
+				Molecule newHs = hsCreator.createHyperstructure(result);
+				
+				String hsSMARTS = null;
+				try {
+					hsSMARTS = MolExporter.exportToFormat( newHs, "smarts") ;
+					System.out.println("new hs - " + hsSMARTS );
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				//findMCS( newHs, cmol1, true );
+				System.out.println("ChemAxon HS bonds - " + newHs.getBondCount() );
+				
+				return hsSMARTS;
+	}
+	
+	
+	
+	
+	
+	public static void main( String[] argv ) {
+		
+		
+		IQueryAtomContainer hsCDK = null, hsCA = null;
+		SmartsParser sp3 = new SmartsParser();
+		SmilesGenerator sg = new SmilesGenerator().aromatic();
+		//SMARTSGenerator smg = new SMARTSGenerator(true);
+		//String inputFileName = "/usr/users/people/edmund/Documents/PhD/workspace/cisrg/data/input/mddr/mddr_thrombin_random_10.sdf";
+		//String inputFileName = "/usr/users/people/edmund/Documents/PhD/workspace/cisrg/data/input/mddr/mddr_37110_MaxMin_10.sdf";
+		String inputFileName = "/usr/users/people/edmund/Documents/PhD/workspace/cisrg/data/input/mos_mapping_test.smi";
+		//String inputFileName = "/usr/users/people/edmund/Documents/PhD/workspace/cisrg/data/input/chembl751606.smi";
+		//String inputFileName = "/usr/users/people/edmund/Documents/PhD/workspace/cisrg/data/input/hyperstructure_query_test1.smi";
+		//String inputFileName = "/opt/fmcs/hs_examples/test1.smi";
+		
+		
+		SmartsHelper smh = new SmartsHelper(DefaultChemObjectBuilder.getInstance());
+		QueryAtomContainer qac = sp3.parse("O=C(NC-;@C1C=;@C:;@N2([#6](~[#7])~[#7])CC-1-O-2)C6N(C(=O)C3(O)[#6]5:[#6]([#6]4:[#6]-3~[#6][#6]~[#6][#6]~4)~[#6][#6]~[#6][#6]~5)CCC-6");
+		IAtomContainer testMol;
+		sp3.parse("C-|2C5");
+		ChemAxonMCSOptions mcsOpts = new ChemAxonMCSOptions();
+		mcsOpts.connectedMode = false;
+		mcsOpts.matchBonds = true;
+		mcsOpts.ringEnforcement = true;
+		mcsOpts.SMARTSHandling = true;
+		
+		try {
+			testMol = new SmilesParser(DefaultChemObjectBuilder.getInstance()).parseSmiles("C%21CCCCC%21");
+			QueryAtomContainer qac2 = sp3.parse("[#6;R][#6;R]");
+			Molecule cmol1 = CDKToChemAxon(qac2, true);
+			Molecule cmol2 = CDKToChemAxon(testMol, true);
+			McsSearchResult result = calculateMappingResult( cmol1, cmol2, mcsOpts );
+			//calculateAtomMapping(qac2, testMol, mcsOpts);
+			calculateAtomMapping( qac2, testMol, cmol1, cmol2, result, mcsOpts );
+		} catch (InvalidSmilesException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		
+		String idProperty = "_zid";
+		
+		//ConvenienceTools.correctAtomBondTypes(qac);
+		System.out.println( "test smarts: " + smh.toSmarts( qac) );
+		
+		ArrayList<IAtomContainer> graphs = null;
+		try {
+			graphs = ConvenienceTools.getQueryMolecules( new File( inputFileName ), null );
+			//System.out.println( "ringedbefore: " + smh.toSmarts(  sp3.parse( sg.createSMILES(graphs.get(0)) ) ) );
+			for( IAtomContainer graph : graphs ) { 
+				
+				ConvenienceTools.initializeMolecule(graph);
+				
+				
+				for( IAtom at : graph.atoms() ) {
+					at.setProperty( idProperty, "" + graph.getAtomNumber(at) );
+				}
+				
+				
+				
+				ZhuGraphMatching.assignLabels(graph);
+				System.out.println( "graph : " + sg.create(graph) );
+			}
+			
+		} catch (FileFormatException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (CDKException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		graphs = new ArrayList<IAtomContainer>( graphs.subList(0, 2) );
+		/*ArrayList<IAtomContainer> tempGraphs = new ArrayList<IAtomContainer>(5);
+		tempGraphs.add( graphs.get(0) );
+		tempGraphs.add( graphs.get(3) );
+		tempGraphs.add( graphs.get(4) );
+		graphs = tempGraphs;*/
+		ConvenienceTools.correctAtomBondTypes(  qac );
+		//ConvenienceTools.sortBySimilarityMCS(graphs);
+		/*
+		//ExtendedIsomorphism caxi = new ExtendedIsomorphism(ExtendedAlgorithm.ChemAxon_dMCES, true);
+		try {
+			ConvenienceTools.correctAtomBondTypes(  qac );
+			//caxi.init( qac, graphs.get(0) );
+		} catch (CDKException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		*/
+		
+		System.out.println( "first molecule: " + sg.createSMILES( graphs.get(0) ) );
+		hsCA = QueryAtomContainerCreator.createBasicQueryContainer( graphs.get(0) );
+		//hsCA = smh.getQueryAtomContainer(graphs.get(0), true);
+		try {
+			hsCA = sp3.parse( sg.create(graphs.get(0)) );
+			hsCDK = sp3.parse( sg.create(graphs.get(0)) );
+		} catch (CDKException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		
+		for( int c = 1; c < graphs.size(); c++ ) {
+			
+			long CAMapTime1 = System.currentTimeMillis();
+			
+			ConvenienceTools.correctAtomBondTypes(hsCDK);
+			CDKSMARTSHyperstructureFitness hsf = new CDKSMARTSHyperstructureFitness(hsCDK, graphs.get(c), true, false, c );
+			
+			
+			if( c == 1 ) {
+				ConvenienceTools.countRings( hsCDK );
+				hsf.setRingBonds();
+				System.out.println( "ringed: " + smh.toSmarts( (QueryAtomContainer) hsCDK) );
+			}
+			
+			//hsf.getAllBondMatchHyperstructure(false);
+			//graphs.set(0, hs);
+			
+			System.out.println( "query molecule: " + sg.createSMILES( graphs.get(c) ) );
+			
+			mcsOpts.connectedMode = false;
+			mcsOpts.matchBonds = false;
+			//mcsOpts.ringEnforcement = true;
+			mcsOpts.SMARTSHandling = false;
+			mcsOpts.verbose = true;
+			
+			IQueryAtomContainer hsCDKDupe = new QueryAtomContainer( hsCDK, hsCDK.getBuilder() );
+			new CDKSMARTSHyperstructureFitness(hsCDKDupe, graphs.get(c), true, false, c ).getAllBondMatchHyperstructure(false) ;
+			CDKSMARTSHyperstructureFitness.configureBondOrders(hsCDKDupe);
+			
+			Molecule cmol1 = CDKToChemAxon(hsCDKDupe, mcsOpts.SMARTSHandling);
+			Molecule cmol2 = CDKToChemAxon(graphs.get(c), mcsOpts.SMARTSHandling);
+			McsSearchResult result = calculateMappingResult( cmol1, cmol2, mcsOpts );
+			//calculateAtomMapping(qac2, testMol, mcsOpts);
+			ArrayList<Integer> chrMapping = calculateAtomMapping( hsCDKDupe, graphs.get(c), cmol1, cmol2, result, mcsOpts );
+			//ArrayList<Integer> chrMapping = calculateAtomMapping( hsCDKDupe, graphs.get(c), mcsOpts );
+			//ArrayList<Integer> chrMapping = calculateMapping( hsCDK, graphs.get(c), mcsOpts );
+			
+			
+			//DoubleMatrix2D translate1 = ZhuGraphMatching.globalSimilarity(g1, g2)
+			
+			for( int n = 0; n < hsCDK.getAtomCount(); n++ ) {
+				System.out.print( n + "=" + hsCDK.getAtom(n).getSymbol() + ", " );
+			}
+			System.out.println();
+			for( int n = 0; n < graphs.get(c).getAtomCount(); n++ ) {
+				System.out.print( n + "=" + graphs.get(c).getAtom(n).getSymbol() + ", " );
+			}
+			System.out.println();
+			
+			System.out.println( "mapping: " + chrMapping );
+			
+			long CAMapTime2 = System.currentTimeMillis();
+			System.out.println( "mapping time taken: " + (CAMapTime2 - CAMapTime1) );
+			
+			
+			
+			
+			
+			
+			for( IAtom at : hsCDK.atoms() ) {
+				at.setProperty( idProperty, "" + hsCDK.getAtomNumber(at) );
+			}
+			
+			
+			//CDKHyperstructureFitness hf3 = new CDKHyperstructureFitness( hsCA, graphs.get(c) );
+			//hf3.calculateMCS(chrMapping);
+			
+			/*
+			
+			chrMapping = ZhuGraphMatching.randomRefine1(graphs.get(c), hsCDK, chrMapping, false, true);
+			chrMapping = ZhuGraphMatching.randomRefine1(graphs.get(c), hsCDK, chrMapping, true, true);
+			
+			
+			try {
+				
+				List<Map<Integer, Integer>> tempM = ZhuGraphMatching.searchMcGregorMapping( graphs.get(c), hsCDK, chrMapping);
+				
+				ArrayList<Integer> chromosome3 = new ArrayList<Integer>( graphs.get(c).getAtomCount() );
+				for( int n = 0; n < graphs.get(c).getAtomCount(); n++ ) 
+					chromosome3.add( (n * -1) - 1 );
+					
+				for( Entry<Integer, Integer> ar : tempM.get(0).entrySet() ) {
+					chromosome3.set( ar.getKey(), ar.getValue() );
+				}
+		        System.out.println( "this map: " + chromosome3 + " | " + sg.createSMILES( ConvenienceTools.createCommonSubgraph(hsCDK, graphs.get(c), chrMapping) ) );
+		        chrMapping = chromosome3;
+			} catch (CDKException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			*/
+			
+			
+			
+			//ConvenienceTools.calculateHyperstructure(queries, mapper, queryAtoms, queryBonds, hybridMethod)
+			// hyperstructure creation
+			
+			// define ring bonds here
+			
+			hsf.getAllBondMatchHyperstructure(false);
+			
+			hsCDK = hsf.createHyperstructure( chrMapping );  
+			//System.out.println( "hs so far: " + smg.createSMILES(hsCDK) );
+			
+			hsf.restoreHyperstructureBonds(false);
+			
+			long HSTime = System.currentTimeMillis();
+			System.out.println( "hyperstructure time taken: " + (HSTime - CAMapTime2) );
+			
+			MCSFitness mf = new MCSFitness( hsCDK, graphs.get(c) );
+			//System.out.println( "mapping fitness: " + mf.fitness(chrMapping) );
+			try {
+				System.out.println( "fitness: " +  mf.fitness(chrMapping) + " " + sg.create( 
+						ConvenienceTools.createCommonSubgraph(hsCDK, graphs.get(c), chrMapping) ) 
+				);
+			} catch (CDKException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			System.out.println( "Hyperstructure bonds: " + hsCDK.getBondCount() );
+			
+			String hsCASMARTS = createHyperstructureSMARTS( hsCA, graphs.get(c) );
+			hsCA = sp3.parse(hsCASMARTS);
+			
+			String hsCDKSMARTS2 =  smh.toSmarts( (QueryAtomContainer) hsCDK); // smg.createSMILES(hsCDK);
+			//System.out.println( "old hs - " + hsSmiles2 );
+			
+			System.out.println( "cdk hs - " + hsCDKSMARTS2 );
+			
+			// bond frequencies
+			for( int bIndex = 0; bIndex < hsCDK.getBondCount(); bIndex++ ) {
+				System.out.println( bIndex + " : " + hsCDK.getBond(bIndex).getProperty( "_bfreq" ) );
+			}
+		}
+		
+		ConvenienceTools.printHyperstructureStats(hsCDK, graphs.toArray( new IAtomContainer[0] ) );
+		
+		ConvenienceTools.correctAtomBondTypes(hsCDK);
+		
+		String hsCDKSMARTS2 =  smh.toSmarts( (QueryAtomContainer) hsCDK); // smg.createSMILES(hsCDK);
+		//System.out.println( "old hs - " + hsSmiles2 );
+		
+		System.out.println("ChemAxon HS: ");
+		//String hsCASMARTS = createHyperstructureSMARTS( graphs.get(0), graphs.get(1) );
+		//System.out.println( "cdk hs - " + hsCDKSMARTS2 );
+		IQueryAtomContainer hsSM = sp3.parse( hsCDKSMARTS2 );
+		//hsSM = QueryAtomContainerCreator.createBasicQueryContainer(hsSM);
+		IAtomContainer hsCAOrd = null, hsCDKOrd = null;
+		//hs = SMARTSParser.parse(hsSMARTS, DefaultChemObjectBuilder.getInstance() );
+		//hsCA = sp3.parse(hsCASMARTS);
+		
+		ConvenienceTools.correctAtomBondTypes(hsCA);
+		ConvenienceTools.correctAtomBondTypes(hsSM);
+		
+		
+		
+		try {
+			for( IAtom atom : hsCA.atoms() ) { 
+				if (atom.getImplicitHydrogenCount() == CDKConstants.UNSET) atom.setImplicitHydrogenCount(0);
+			}
+			for( IAtom atom : hsCDK.atoms() ) { 
+				if (atom.getImplicitHydrogenCount() == CDKConstants.UNSET) atom.setImplicitHydrogenCount(0);
+			}
+			String hsCASMILES = sg.create(hsCA);
+			hsCAOrd = new SmilesParser(DefaultChemObjectBuilder.getInstance()).parseSmiles(hsCASMILES);
+			ConvenienceTools.initializeMolecule(hsCAOrd);
+			
+			String hsCDKSMILES = sg.create(hsCDK);
+			hsCDKOrd = new SmilesParser(DefaultChemObjectBuilder.getInstance()).parseSmiles(hsCDKSMILES);
+			ConvenienceTools.initializeMolecule(hsCDKOrd);
+		} catch (InvalidSmilesException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch( CDKException e2 ) {
+			e2.printStackTrace();
+		}
+		
+		//GATest.printHyperstructureStats(hs, graphs.toArray(new IAtomContainer[0]));
+		//System.out.println( "hs so far: " + smg.createSMILES(hsSM) );
+		System.out.println( "hs so far: " + smh.toSmarts( (QueryAtomContainer) hsSM) );
+		
+		ConvenienceTools.correctAtomBondTypes(hsSM);
+		ConvenienceTools.printHyperstructureStats(hsCA, graphs.toArray( new IAtomContainer[0] ) );
+		
+		mcsOpts.SMARTSHandling = true;
+		//ExtendedIsomorphism exi = new ExtendedIsomorphism(ExtendedAlgorithm.VFLibMCS, true);
+		//ExtendedIsomorphism exi = new ExtendedIsomorphism(compound1, compound2, ExtendedAlgorithm.VFLibMCS );
+		try {
+			IAtomContainer cGraph = new SmilesParser(DefaultChemObjectBuilder.getInstance()).parseSmiles("C(C)1NC(=O)CCC1");
+			//IAtomContainer cGraph = graphs.get(0);
+			
+			//String hsSMILES = sg.createSMILES(hsCA);
+			//IAtomContainer hsS2 = new SmilesParser(DefaultChemObjectBuilder.getInstance()).parseSmiles(hsSMILES);
+			//ConvenienceTools.initializeMolecule(hsS2);
+			//exi.init( hsCDK, cGraph );
+			mcsOpts.matchBonds = true;
+			mcsOpts.ringEnforcement = true;
+			
+			Molecule chsSM = CDKToChemAxon(hsSM, mcsOpts.SMARTSHandling);
+			Molecule chsCA = CDKToChemAxon(hsCA, mcsOpts.SMARTSHandling);
+			Molecule cmolG = CDKToChemAxon(cGraph, mcsOpts.SMARTSHandling);
+			McsSearchResult result = calculateMappingResult( chsSM, cmolG, mcsOpts );
+			//calculateAtomMapping(qac2, testMol, mcsOpts);
+			
+			
+			System.out.println("mapping to CDK HS: ");
+			ArrayList<Integer> chrMapping2 = calculateAtomMapping( hsSM, cGraph, chsSM, cmolG, result, mcsOpts );
+			//ArrayList<Integer> chrMapping2 = calculateAtomMapping( hsSM,  cGraph, mcsOpts );
+			
+			System.out.println("Benchmark Mapping: ");
+			calculateAtomMapping( hsCA, cGraph, chsCA, cmolG, result, mcsOpts );
+			
+			System.out.println( "query: " + sg.create( cGraph ) + " | " + hsSM.getProperty(mcsSizeParam) );
+			
+			/*
+			ArrayList<Integer> chromosome3 = new ArrayList<Integer>( hsSM.getAtomCount() );
+			for( int n = 0; n < hsSM.getAtomCount(); n++ ) 
+				chromosome3.add( (n * -1) - 1 );
+				
+			for( Entry<Integer, Integer> ar : exi.getFirstMapping().entrySet() ) {
+				chromosome3.set( ar.getKey(), ar.getValue() );
+			}
+			IAtomContainer commonvf = ConvenienceTools.createCommonSubgraph( hsSM, cGraph, exi.getFirstBondMap() );
+			
+			System.out.println( "VF mapped bonds: " + exi.getFirstBondMap().size() + " " + sg.createSMILES( commonvf ) );
+			*/
+			
+			UniversalIsomorphismTester uit = new UniversalIsomorphismTester();
+			
+			System.out.println( uit.isIsomorph(hsCDKOrd, hsCAOrd) );
+		} catch (CDKException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+
+	@Override
+	public void search(IAtomContainer graph1, IAtomContainer graph2) {
+		// TODO Auto-generated method stub
+		
+		setMainMol(graph1);
+		setQueryMol(graph2);
+		
+		
+		if( cmol1 == null || cmol2 == null ) {
+			cmol1 = CDKToChemAxon(hsMol, options.SMARTSHandling);
+			cmol2 = CDKToChemAxon(qMol, options.SMARTSHandling);
+		}
+		
+		mcsExecTime = System.currentTimeMillis();
+		McsSearchResult result = calculateMappingResult( cmol1, cmol2, options );
+		mcsExecTime = System.currentTimeMillis() - mcsExecTime;
+		
+		ArrayList<Integer> mapping = calculateAtomMapping( hsMol, qMol, cmol1, cmol2, result, options );
+		
+		mcsAtomIsomorphisms = new ArrayList<List<Integer>>();
+		mcsAtomIsomorphisms.add( mapping );
+		
+		Map<IBond, IBond> bondMapping = calculateBondMapping( hsMol, qMol, result, options );
+		mcsBondIsomorphisms = new ArrayList<Map<IBond, IBond>>();
+		mcsBondIsomorphisms.add( bondMapping );
+		
+		
+	}
+	
+
+	/*@Override
+	public int execute() {
+		
+		if( cmol1 == null || cmol2 == null ) {
+			cmol1 = CDKToChemAxon(hsMol, options.SMARTSHandling);
+			cmol2 = CDKToChemAxon(qMol, options.SMARTSHandling);
+		}
+		
+		long time2 = System.currentTimeMillis();
+		McsSearchResult result = calculateMappingResult( cmol1, cmol2, options );
+		//System.out.println( "chemaxon MCS time = " + ( System.currentTimeMillis() - time2 ));
+		
+		ArrayList<Integer> mapping = calculateAtomMapping( hsMol, qMol, cmol1, cmol2, result, options );
+		mcsAtomIsomorphisms = new ArrayList<ArrayList<Integer>>();
+		mcsAtomIsomorphisms.add( mapping );
+		
+		Map<IBond, IBond> bondMapping = calculateBondMapping( hsMol, qMol, result, options );
+		mcsBondIsomorphisms = new ArrayList<Map<IBond, IBond>>();
+		mcsBondIsomorphisms.add( bondMapping );
+		
+		mcsSize = hsMol.getProperty(mcsSizeParam);
+		fragmentSizes = hsMol.getProperty( fragmentsParam );
+		mcsSMARTS = hsMol.getProperty( mcsResult );
+		
+		return 0;
+	}*/
+	
+
+	public void setMainMol( IAtomContainer m1 ) {
+		hsMol = m1;
+		cmol1 = CDKToChemAxon(hsMol, options.SMARTSHandling);
+		
+	}
+	
+	public void setQueryMol( IAtomContainer m2 ) {
+		qMol = m2;
+		cmol2 = CDKToChemAxon(qMol, options.SMARTSHandling);
+	}
+
+	
+	@Override
+	public void setMatchBonds( boolean b ) {
+		super.setMatchBonds(b);
+		options.matchBonds = b;
+	}
+	
+	
+	public ChemAxonMCSOptions getOptions() {
+		return options;
+	}
+
+
+	private Molecule cmol1;
+	private Molecule cmol2;
+	
+	private ChemAxonMCSOptions options;
+	//private boolean smartsHandling = false;
+	//private boolean connectedMode = false;
+	//public boolean verbose = false;
+	//private static SmartsParser smaP = new SmartsParser();
+	
+
+	//public long mcsTimeTaken = 0;
+	
+	private static String mcsSizeParam = "_mcssize";
+	private static String mcsResult = "_mcssmarts";
+	private static String fragmentsParam = "_frags";
+	
+	
+}
