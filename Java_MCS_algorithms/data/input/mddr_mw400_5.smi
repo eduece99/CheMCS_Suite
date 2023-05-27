@@ -1,0 +1,7 @@
+CC(=O)SCC(C)C(=O)N1CCCC1C(=O)NC(Cc1ccccc1)C(=O)O
+N=C(N)NCCCCCCC(=O)NC(O)C(=O)NCCCCNCCCN
+CCn1c(-c2ccc(OC)c(OC)c2)c/c(=N/c2c(C)cc(C)cc2C)n(C)c1=O
+COC(=O)CCC(=O)N(O)c1cccc(OCc2ccc3ccccc3n2)c1
+C/C(=C(/OCCOc1ccc(Cl)cc1)c1ccc(Cl)cc1Cl)n1ccnc1
+ 
+ 5 compounds from the mddr.sdf dataset with molecular weights between 375 and 425.

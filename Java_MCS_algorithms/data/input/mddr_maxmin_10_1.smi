@@ -1,0 +1,12 @@
+FC(F)(F)C(F)(F)C(F)(F)N(C(F)(F)C(F)(F)C(F)(F)F)C(F)(F)C(F)(F)C(F)(F)F
+Cc1ccc(N2CCCC2CN2CCN(CCc3ccccc3C)CC2)cc1
+C=C=CCNCCCNCCCCCCCCNCCCNCC=C=C
+Oc1c(I)c(O)c(I)c(-c2c(I)c(O)c(I)c(O)c2I)c1I
+ClP1(Cl)=NP2(=NP(Cl)(Cl)=N1)NCCOCCOCCN2
+O=c1[nH]c2cc(Br)c(Br)c([N+](=O)[O-])c2[nH]c1=O
+N#CC1C(O)C(O)C(O)C(O)C1O
+CC1(C)CC(C)(C)CC(C)(N)C1
+C=C(Cl)C(N)C(=O)O
+CCN(CC)C(=S)S
+
+ 10 compounds taken from mddr.sdf (Val and John's salt and dupe-filtered version of the MDDR database).  The RDKit MaxMin diversity selection algorithm was used, with "Morgan" fingerprints based on ECFP_4 used.  No other restrictions have been applied.

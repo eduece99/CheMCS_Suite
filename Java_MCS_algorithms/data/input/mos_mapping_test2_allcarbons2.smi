@@ -1,0 +1,3 @@
+Cc1cccc(CC(=C)CC2C=C(c3ccccc3)c3ccccc3C(CC(=C)C3CCCC3)C2=C)c1
+CCc1ccccc1C(Cc1ccccc1)C(=C)C(CCC(C)=C)CC(=C)c1cc2ccccc2c1
+ Example posed in the RASCAL paper for MCS finding

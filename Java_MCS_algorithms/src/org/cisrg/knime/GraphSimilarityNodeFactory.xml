@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE knimeNode PUBLIC "-//UNIKN//DTD KNIME Node 2.0//EN" "http://www.knime.org/Node.dtd">
+<knimeNode icon="clique_icon.png" type="Source">
+    <name>Graph Similarity</name>
+    
+    <shortDescription>
+        Graph-based similarity searching with support for hyperstructures
+    </shortDescription>
+    
+    <fullDescription>
+        <intro>This node creates a new column containing the minimum, maximum or average or arrays of a chosen similarity coefficient, derived from calculating the MCS in the first input table against the second input table. The computations are based on the CDK toolkit, in addition to the implementation of several available MCS algorithms and types, including an option for imposing topological distance constraints.  An additional column is appended to the table containing the row id reference. For custom similarity equations, the sizes of the MCS, as well as the reference and database molecules, are outputted (in bond count).</intro>
+        
+        
+        <option name="Reference / Database Molecule Column">Select the column for the Molecule (CDK Type)</option>
+        <option name="Aggregation Method">Select the aggregation method for the calculation</option>
+	<option name="Search Method">Select your desired MCS method.  Details of the methods are explained in the author's PhD Thesis (see chapter 6)</option>
+	<option name="Similarity Type">Tanimoto coefficient yields a symmetric similarity.  Tversky coefficient by contrast is geared towards substructure similarity (alpha=0.1, beta=0.9), where database molecules containing substructures isomorphic to the reference molecules are upweighted.  Number, gives the bond count.</option>
+	<option name="Modular Product Heuristics">Utilises node deletion heuristics to speed up MCS calculation for clique-detection algorithms somewhat.  Can have a minor detrimental impact on result size.</option>
+	<option name="Modular Product Ring Heuristics">Utilises John Raymond's weak and strong ring heuristics to further improve calculation speed.  Can have a moderate detrimental impact on result size.</option>
+	<option name="Topological distance limit">Converts a disconnected MCS to a topological distance-constrained MCS.  Set to -1 to disable, otherwise set to a number to limit the allowed path distance between pairs of bonds in the MCS (lower is more stringent but significantly improves calculation time for clique detection methods)</option>
+	<option name="Expansion time limit">Specify the maximum number of milliseconds each MCS calculation may run for (excluding CDKMCS and VFLIB and DEFAULT).</option>
+	<option name="Output MCS">Renders both molecules in a new cell with the MCS bonds highlighted.  If aggregation method is "matrix" then the MCS SMARTS are output for each comparison instead. </option>
+        <!-- possibly more options that can also be grouped by tabs -->
+        <!--
+        <tab name="Standard Options">
+            <option name="short name of first option (like in the dialog)">description of first option</option>
+            <option name="short name of second option (like in the dialog)">description of second option</option>
+        </tab>
+        <tab name="Advanced Options">
+            <option name="short name of first advanced option (like in the dialog)">description of first advanced option</option>
+        </tab>
+        -->
+        <option></option></fullDescription>
+    
+    <ports>
+        <inPort index="0" name="In-Port name">Database Molecules go here</inPort>
+	<inPort index="1" name="In-Port name">Reference Molecules go here</inPort>
+        <!-- possibly more input ports here-->
+        <outPort index="0" name="Out-Port name">Database Molecules table, with MCS similarity information</outPort>
+        <!-- possibly more output ports here-->
+    </ports>    
+    <views>
+        <view index="0" name="name of first view">Nah only joking, there is no view ;) </view>
+        <!--view index="1" name="name of second view">Description of second view...</view-->
+    </views>
+</knimeNode>

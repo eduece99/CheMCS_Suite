@@ -1,0 +1,9 @@
+CNc1nccc2c1c3ncnc(N4CCN(CCc5ccc(F)c(F)c5)CC4)c3n2C
+CCOC(=O)Cn1c2ccc(cc2c3ncnc(N4CCN(CCc5ccc(F)c(F)c5)CC4)c13)[N+](=O)[O-]
+[O-][N+](=O)c1cc(c2[nH]c3c(nc(CN4CCOCC4)nc3c2c1)N5CCN(CCc6ccc(F)c(F)c6)CC5)[N+](=O)[O-]
+Cn1c2cccc(C(=O)N)c2c3nc(CN4CCOCC4)nc(N5CCN(CCc6ccc(F)c(F)c6)CC5)c13
+Fc1ccc(CCN2CCN(CC2)c3[nH]cnc4c3nc5cccc(C#N)c45)cc1F 
+
+ These molecules are a benchmark for hyperstructure creation - they're all from the same series, 
+ and are big and relatively similar.  A good hyperstructure generator should be able to compress
+ these 5 by a large factor

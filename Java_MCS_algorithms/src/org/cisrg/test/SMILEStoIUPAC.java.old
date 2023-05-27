@@ -1,0 +1,135 @@
+package test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.StringBufferInputStream;
+import java.io.StringWriter;
+
+import chemaxon.formats.MolConverter;
+import chemaxon.formats.MolExporter;
+import chemaxon.formats.MolFormatException;
+import chemaxon.formats.MolImporter;
+import chemaxon.marvin.io.MolExportException;
+import chemaxon.struc.Molecule;
+
+
+public class SMILEStoIUPAC {
+
+	public static void main(String[] args) {
+		
+		MolImporter mim = null;
+		MolExporter mex = null;
+		PrintStream outputStream = null;
+		StringWriter sdfStrings = new StringWriter(6000);
+		StringBufferInputStream inputHolder = new StringBufferInputStream( sdfStrings.getBuffer().toString() );
+		Molecule currentMol = null;
+		
+		try {
+			outputStream = new PrintStream("/home/edmund/Documents/work/PhD/workspace/cisrg/data/input/mddr4.iupac");
+			
+			
+			//mim = new MolImporter( new File("/home/edmund/Documents/work/PhD/workspace/cisrg/data/input/mddr_mw200_5.smi"), null );
+			mim = new MolImporter( "/usr/users/databases/mddr/Struct/mddr.smi" );
+			//mex = new MolExporter( System.out, "name" );
+			mex = new MolExporter( outputStream, "name" );
+			//cmol = mim.read();
+			//cmol.aromatize();
+			
+			
+			
+		} catch (IOException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+		
+		int counter = 0;
+		try {
+			while( (currentMol = mim.read()) != null ) {
+				
+				//mex.write(currentMol);
+				String systematic = "error";
+				try {
+					systematic = MolExporter.exportToFormat(currentMol, "name").trim();
+					systematic = systematic.replaceAll(" ", "_");  // Need to remove spaces for delimiting purposes in C
+				} catch (Exception e) {
+					System.err.println("Unable to create IUPAC name, skipping molecule...");
+					//e.printStackTrace();
+					systematic = "error";
+					continue;
+				}
+				outputStream.print( systematic );
+				outputStream.print("\t");
+				outputStream.print( MolExporter.exportToFormat(currentMol, "smiles").trim() );
+				outputStream.print("\t");
+				outputStream.print(currentMol.getName());
+				outputStream.print("\n");
+				
+				System.out.println( currentMol.getName() );
+				counter++;
+				//if( counter > 10 )
+					//break;
+			}
+		} catch (MolExportException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		try {
+			mim.close();
+			mex.close();
+		} catch (MolExportException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		/*
+		MolConverter.Builder mcbld = new MolConverter.Builder();
+	     mcbld.addInput("/usr/users/databases/mddr/Struct/mddr.smi", "");
+	     mcbld.setOutput("mddr2.iupac", "name");
+	     mcbld.setOutputFlags(MolExporter.TEXT);
+	     MolConverter mc = null;
+		try {
+			mc = mcbld.build();
+		} catch (MolFormatException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (MolExportException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+	     try {
+			while(mc.convert());
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	     
+	     
+	     try {
+			mc.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	     */
+		
+	}
+	
+}

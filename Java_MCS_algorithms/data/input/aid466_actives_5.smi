@@ -1,0 +1,7 @@
+C=C[C@H]1CN2CC[C@H]1CC2[C@@H](O)c1ccnc2ccc(OC)cc21
+C[C@@H]1CN(c2ncccc2F)CCN1/C(=N/C#N)Nc1ccc(C(C)(C)C)cc1
+O=C1NC[C@H](c2ccc(F)cc2)C12CCN(C1(c3ccc(F)cc3)CCCCC1)CC2
+Cc1ccc2c(n1)N1[C@H](C2)CNC[C@H]1C
+COCCOCC#Cc1cc(-c2n[nH]c3c2C(=O)c2cc(CN4CCN(C)CC4)ccc2-3)cs1
+
+ The first 5 actives from the MUV aid466 set.  They're all of different scaffolds but being actives - they should have some form of common feature!

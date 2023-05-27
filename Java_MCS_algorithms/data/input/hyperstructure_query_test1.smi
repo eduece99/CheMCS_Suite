@@ -1,0 +1,5 @@
+NCC1CCC(C1)C1CCCCC1
+CC1CC[C]234CCCC2(CCCC3N)C(C(C)C14)[C]1(C)(C)C(C)[C]2(C)(C)CCCC22CCC(C)C2C1(C)C
+
+ 2 molecules - the first molecule is a perfect substructure of the second, but in the second all the degrees are different.  A good mapping algorithm should be able to account for this.
+

@@ -1,0 +1,7 @@
+CC(C)NCC(O)c1ccc(N)c(C#N)c1
+OC1CCN2CC(O)C(O)C(O)C12
+O=c1c2ccccc2ncn1-c1nnn[nH]1
+O=C(/C=C\c1ccc(O)cc1)NCCO
+CC1(C)c2cc3[nH]nnc3cc2NC1=O
+ 
+ 5 compounds from the mddr.sdf dataset with molecular weights between 175 and 225.

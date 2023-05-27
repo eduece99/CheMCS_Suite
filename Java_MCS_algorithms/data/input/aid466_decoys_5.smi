@@ -1,0 +1,7 @@
+CCCn1c2nc(C3CCCC3)[nH]c2c(=O)n(CCC)c1=O
+CN1c2ccc(Cl)cc2C(c2ccc(Cl)cc2)=NCC1=O
+COc1ccc(CCN2CCC(Nc3nc4ccccc4n3Cc3ccc(F)cc3)CC2)cc1
+NCC(CC(=O)O)c1ccc(Cl)cc1
+NS(=O)(=O)c1cc2c(cc1C(F)(F)F)NC(Cc1ccccc1)NS2(=O)=O
+
+ These molecules are a benchmark for hyperstructure creation - 5 molecules chosen from AID466 MUV dataset of decoys.  As they're "equidistant" from each other in terms of chemical space but otherwise pretty dissimilar, these should provide an alternative benchmark from the similar molecules as a perfect mapping (fitness of 100%) should not be possible
