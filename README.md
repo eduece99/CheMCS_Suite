@@ -7,12 +7,23 @@ PhD project work with Sheffield University (Under supervision of Professor Peter
 
 
 
-Usage
+Compilation
 -----------
 Please compile using Eclipse IDE (I used Mars.2).  Usage examples revolve around the ```ExtendedIsomorphism``` class, in ```MCSMethodsTest.java```
 
+More recommended however is to build the project using Maven.  It is best to do this in order to create a .jar file for command line usage.  
+
 <br />
 <br />
+
+
+Command Line Usage
+-----------
+
+Navigate to the directory where the jar file in question has been created (via Maven)
+
+java -jar Java_MCS_algorithms-1.0.0-jar-with-dependencies.jar  ../data/input/chembl751606.smi ../data/input/aid466_decoys_5.sdf
+
 
 
 **Citing** 
