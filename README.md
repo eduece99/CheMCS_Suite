@@ -22,8 +22,9 @@ Command Line Usage
 
 Navigate to the directory where the jar file in question has been created (via Maven)
 
+```
 java -jar Java_MCS_algorithms-1.0.0-jar-with-dependencies.jar  ../data/input/chembl751606.smi ../data/input/aid466_decoys_5.sdf
-
+```
 
 
 **Citing** 
