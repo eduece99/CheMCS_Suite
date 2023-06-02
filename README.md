@@ -1,9 +1,9 @@
-Java_MCS_algorithms
+MCS Suite
 ===========
 
 Description
 -----------
-PhD project work with Sheffield University (Under supervision of Professor Peter Willett and Doctor John Holliday).  Variety of Maximum Common Substructure (MCS) algorithms for use with chemical graphs/structures.  Coded in Java 1.6.
+PhD project work with Sheffield University (Under supervision of Professor Peter Willett and Doctor John Holliday).  Variety of Maximum Common Substructure (MCS) algorithms for use with chemical graphs/structures.  Originally coded in Java 1.6.
 
 
 

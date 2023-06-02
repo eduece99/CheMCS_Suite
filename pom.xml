@@ -7,8 +7,8 @@
   <description>Generates the Maximum Common Substructure (subgraph) from input molecules</description>
   
   <properties>
-   <maven.compiler.source>18</maven.compiler.source>
-   <maven.compiler.target>18</maven.compiler.target>
+   <maven.compiler.source>11</maven.compiler.source>
+   <maven.compiler.target>11</maven.compiler.target>
  </properties>
  
    <repositories>
@@ -24,11 +24,11 @@
       <resource>
         <directory>src</directory>
         <excludes>
-          <exclude>src/org/cisrg/knime/*.java</exclude>
+          <exclude>${basedir}/src/org/cisrg/knime/*.java</exclude>
         </excludes>
       </resource>
       <resource>
-        <directory>src/org/cisrg/knime</directory>
+        <directory>${basedir}/src/org/cisrg/knime</directory>
         <excludes>
           <exclude>**/*.java</exclude>
         </excludes>
@@ -47,6 +47,10 @@
           </execution>
         </executions>
         <configuration>
+			<excludes>
+                    <exclude>${basedir}/src/org/cisrg/knime</exclude>
+                    <exclude>${basedir}/src/org/cisrg/render</exclude>
+            </excludes>
 			<archive>
             <manifest>
 				<addClasspath>true</addClasspath>
