@@ -5,6 +5,8 @@ Description
 -----------
 PhD project work with Sheffield University (Under supervision of Professor Peter Willett and Doctor John Holliday).  Variety of Maximum Common Substructure (MCS) algorithms for use with chemical graphs/structures.  Originally coded in Java 1.6.
 
+This project can either be used via the executable jar file in any releases, or compiled from the source here.
+
 
 
 Compilation
@@ -25,6 +27,9 @@ Navigate to the directory where the jar file in question has been created (via M
 ```
 java -jar Java_MCS_algorithms-1.0.0-jar-with-dependencies.jar  ../data/input/chembl751606.smi ../data/input/aid466_decoys_5.sdf
 ```
+
+For more usage information on the CLI, see the wiki.
+
 
 
 **Citing** 
