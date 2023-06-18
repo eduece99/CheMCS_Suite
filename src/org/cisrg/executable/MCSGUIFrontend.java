@@ -39,11 +39,15 @@ import org.cisrg.knime.GraphSimilarityNodeModel.ReturnType;
 import org.cisrg.knime.GraphSimilarityNodeModel.SimilarityType;
 import org.cisrg.mapping.ConvenienceTools;
 import org.cisrg.mapping.ExtendedAlgorithm;
+import org.cisrg.mapping.SimilarityComparator;
 import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.smiles.SmilesParser;
+
+import picocli.CommandLine.Option;
+
 import org.openscience.cdk.depict.DepictionGenerator;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.exception.InvalidSmilesException;
@@ -55,6 +59,8 @@ public class MCSGUIFrontend extends Frame {
 	
 	private void addMoleculesToPanel( List<IAtomContainer> mols ) {
 		
+		simHub.calculateSimilarity(mols.get(0), mols.get(1));
+		
 		Image bi = null;
 		DepictionGenerator dptgen = new DepictionGenerator();
 		
@@ -62,12 +68,24 @@ public class MCSGUIFrontend extends Frame {
 	    gbc.gridx = 0;
         gbc.gridy = 0;
 		
-		for( IAtomContainer mol : mols ) {
+		for( int mi = 0; mi < mols.size(); mi++ ) {
+			
+			IAtomContainer mol = mols.get(mi);
+			
 		    try {
-				  bi = dptgen.withSize(200, 250)              // px (raster) or mm (vector)
+		    	  dptgen = dptgen.withSize(200, 250)              // px (raster) or mm (vector)
 				      .withMolTitle()
-				      .withTitleColor(Color.DARK_GRAY) // annotations are red by default
-				      .depict(mol).toImg();
+				      .withTitleColor(Color.DARK_GRAY); // annotations are red by default
+
+				  
+				  if( mi == 0 ) {
+					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , Color.RED).withOuterGlowHighlight(2.0) ;
+				  } else {
+					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , Color.RED).withOuterGlowHighlight(2.0) ;
+				  }
+				  
+				  bi = dptgen.depict(mol).toImg();
+							
 			} catch (CDKException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -195,6 +213,15 @@ public class MCSGUIFrontend extends Frame {
 	
 	final JFileChooser fc;
 	
+	SimilarityComparator simHub = null;
+	private String algorithmName = "Depolli_dMCES";
+    private int topologicalDistanceLimit = 4;
+    private boolean ringHeuristics = false;
+    private boolean raymondHeuristics = false;
+    private int timeLimit = 10000;
+	private boolean ghostSubstructures = false;
+	private boolean bondWeightFlag = false;
+	
 	
 	public static ExtendedAlgorithm[] MappingAlgorithmNames = new ExtendedAlgorithm[] {
 			ExtendedAlgorithm.DEFAULT,
@@ -246,6 +273,12 @@ public class MCSGUIFrontend extends Frame {
        */
 		
 		
+		ExtendedAlgorithm algorithm = ExtendedAlgorithm.valueOf(algorithmName);
+		
+		simHub = new SimilarityComparator(
+				null, bondWeightFlag, ghostSubstructures, algorithm, 
+				raymondHeuristics, ringHeuristics, topologicalDistanceLimit, timeLimit, false
+		);
 		
 		refFileComponent = new JTextField("input file path", 200);  
 		refFileButtonComponent = new JButton("Browse");
