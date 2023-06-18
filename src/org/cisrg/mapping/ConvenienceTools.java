@@ -315,7 +315,7 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 	};
 	
 	
-	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator, boolean processCompounds ) throws IOException {
+	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator, boolean processCompounds ) throws IOException, FileNotFoundException {
 		
 		
 		
@@ -352,7 +352,7 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 			
 		} catch (FileNotFoundException e3) {
 			// TODO Auto-generated catch block
-			e3.printStackTrace();
+			throw e3;
 		}
 		
 		if( ! isr.hasNext() ) {
@@ -429,7 +429,7 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 		return queries;
 	}
 	
-	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator ) throws IOException {
+	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator ) throws IOException, FileNotFoundException {
 		return getQueryMolecules( inputFile, comparator, true );
 	}
 	

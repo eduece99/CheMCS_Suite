@@ -32,8 +32,9 @@ For more usage information on the CLI, see the wiki.
 
 
 
-**Citing** 
-<br />
+Citing
+-----------
+
 Please cite the article below when using this code:
 
 Duesbury et al, 2017, Comparison of Maximum Common Subgraph Isomorphism Algorithms for the Alignment of 2D Chemical Structures, ChemMedChem.  Available at [http://onlinelibrary.wiley.com/doi/10.1002/cmdc.201700482/abstract]

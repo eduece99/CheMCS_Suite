@@ -6,27 +6,16 @@ package org.cisrg.executable;
 import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.math.BigInteger;
-import java.nio.file.Files;
-import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.concurrent.Callable;
 
-import org.cisrg.knime.GraphSimilarityNodeModel;
-//import org.cisrg.knime.CDKValue;
 import org.cisrg.mapping.ConvenienceTools;
 import org.cisrg.mapping.ExtendedAlgorithm;
-import org.cisrg.mapping.ExtendedIsomorphism;
 import org.cisrg.mapping.SimilarityComparator;
 import org.openscience.cdk.depict.DepictionGenerator;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtomContainer;
-import org.openscience.cdk.interfaces.IBond;
-import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -59,11 +48,19 @@ public class MCSCommandLine implements Callable<Integer> {
     @Option(names = {"-i", "--outputImagePath"}, defaultValue = Option.NULL_VALUE, description = "outputs a (PNG) image to the specified file path")
     private String outputImagePath;
     
-    @Option(names = {"-d", "--topologicalDistanceLimit"}, defaultValue = "2", description = "(Integer) maximum distance between 2 bond pairs (between ref and db molecules) to consider when buildng MCS.  Larger allows for less geometrically constrained results, but increases time requirements.")
+    @Option(names = {"-d", "--topologicalDistanceLimit"}, defaultValue = "2", description = "(Integer) maximum distance between 2 bond pairs (between ref and db molecules) to consider when buildng MCS.  Larger allows for less geometrically constrained results, but increases time requirements.  Defaults to 2 if not set.  To disable, set to -1 or a number larger than the number of bonds in your largest input molecule. ")
     private int topologicalDistanceLimit;
+    
+    @Option(names = {"-r", "--ringHeuristics"}, defaultValue = "false", description = "(true/false) Enable to impose constraints on ring matching to hasten MCS calculations.  May reduce MCS size in some comparisons. ")
+    private boolean ringHeuristics = false;
+    
+    @Option(names = {"-R", "--RaymondHeuristics"}, defaultValue = "false", description = "(true/false) Enable to impose constraints from John Raymond's RASCAL publication to hasten MCS calculations.  May reduce MCS size in some comparisons. ")
+    private boolean raymondHeuristics = false;
     
     @Option(names = {"-t", "--timeLimit"}, defaultValue = "10000", description = "(Integer) Maximum time allowed per MCS calculation.")
     private int timeLimit;
+
+
     
     
     private ArrayList<IAtomContainer> setupMolecules( String inputFileName ) {
@@ -118,15 +115,16 @@ public class MCSCommandLine implements Callable<Integer> {
     	ExtendedAlgorithm algorithm = ExtendedAlgorithm.valueOf(algorithmName);
     	
     	
-    	boolean bondWeightFlag = false;
-		boolean bondTypeFlag = true;
-		boolean matchRingFlag = true;
-		boolean matchAtomTypeFlag = true;
-		boolean ghostSubstructures = false;
-		boolean raymondHeuristics = false;
-		boolean ringHeuristics = false;
-		//int topoDistLim = 4;
-		//int timeLimit = 10000;
+    	boolean bondWeightFlag = false;  // assign weights to matched bonds in MCS
+		boolean bondTypeFlag = true;  // set True to make bond labels match, otherwise bond labels are ignored
+		boolean ghostSubstructures = false;  // not currently used
+		boolean detailedGhostInfo = false;  // not currently used
+
+		  // set true to enable ring matching constraints, also to reduce search space
+		//int topologicalDistanceLimit = 4;  // see CLI instructions -d option for info
+		//int timeLimit = 10000;  // milliseconds
+		//boolean matchRingFlag = true;  /
+		//boolean matchAtomTypeFlag = true;
 		
 		//IAtomContainer refMol = refMols.get(0);
 		//IAtomContainer dbMol = dbMols.get(1);
@@ -140,7 +138,7 @@ public class MCSCommandLine implements Callable<Integer> {
 		
 		SimilarityComparator simHub = new SimilarityComparator(
 				null, bondWeightFlag, ghostSubstructures, algorithm, 
-				raymondHeuristics, ringHeuristics, topologicalDistanceLimit, timeLimit, false
+				raymondHeuristics, ringHeuristics, topologicalDistanceLimit, timeLimit, detailedGhostInfo
 		);
 		
 		
@@ -159,6 +157,8 @@ public class MCSCommandLine implements Callable<Integer> {
 				if( outputImagePath != null )
 					depictMolecules( refMol, dbMol, r, d, outputImagePath, simHub );
 
+				
+				System.out.println( "" );  // final new line to delineate pairs
 			}
 		}
 		
