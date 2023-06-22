@@ -1714,5 +1714,5 @@ public class ZhuSpectralMCES extends MCSMethods {
 	
 	protected static Algebra algebra = new Algebra();
 	protected static String compoundPath = "/home/edmund/Documents/work/PhD/workspace/cisrg/data/input/";
-	protected static boolean verbose = true;
+	protected static boolean verbose = false;
 }

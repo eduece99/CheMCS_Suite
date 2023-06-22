@@ -19,11 +19,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.DefaultComboBoxModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -31,6 +35,7 @@ import javax.swing.border.Border;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JTabbedPane;
+import javax.swing.JTable;
 import javax.swing.JFileChooser;
 
 
@@ -57,48 +62,89 @@ import org.openscience.cdk.exception.InvalidSmilesException;
 public class MCSGUIFrontend extends Frame {
 	
 	
-	private void addMoleculesToPanel( List<IAtomContainer> mols ) {
+	private void addMoleculesToPanel() {
 		
-		simHub.calculateSimilarity(mols.get(0), mols.get(1));
+		
+		algorithmName = mappingAlgorithmComponent.getSelectedItem().toString();
+	    topologicalDistanceLimit = Integer.parseInt( topoDistanceLimitComponent.getText() );
+	    ringHeuristics = ringHeuristicsComponent.isSelected();
+	    raymondHeuristics = raymondHeuristicsComponent.isSelected() ;
+	    timeLimit = Integer.parseInt( timeLimitComponent.getText() );
+		
+		ExtendedAlgorithm algorithm = ExtendedAlgorithm.valueOf(algorithmName);
+		
+		simHub = new SimilarityComparator(
+				null, bondWeightFlag, ghostSubstructures, algorithm, 
+				raymondHeuristics, ringHeuristics, topologicalDistanceLimit, timeLimit, false
+		);
+		
+		
 		
 		Image bi = null;
 		DepictionGenerator dptgen = new DepictionGenerator();
+		dptgen = dptgen.withSize(molWidth, molHeight)             
+			      .withMolTitle()
+			      .withTitleColor(Color.DARK_GRAY); 
 		
 		GridBagConstraints gbc = new GridBagConstraints();
 	    gbc.gridx = 0;
         gbc.gridy = 0;
+        
+        ImageIcon[] tableColumns = new ImageIcon[refMols.size()] ;
+        Object[][] tableData = new Object[refMols.size()][dbMols.size()] ;
 		
-		for( int mi = 0; mi < mols.size(); mi++ ) {
+        // have ref molecules as columns, and db molecules as rows
+		for( int r = 0; r < refMols.size(); r++ ) {
 			
-			IAtomContainer mol = mols.get(mi);
-			
-		    try {
-		    	  dptgen = dptgen.withSize(200, 250)              // px (raster) or mm (vector)
-				      .withMolTitle()
-				      .withTitleColor(Color.DARK_GRAY); // annotations are red by default
-
-				  
-				  if( mi == 0 ) {
-					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , Color.RED).withOuterGlowHighlight(2.0) ;
-				  } else {
-					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , Color.RED).withOuterGlowHighlight(2.0) ;
-				  }
-				  
-				  bi = dptgen.depict(mol).toImg();
-							
+			try {
+				Image refImg = dptgen.depict( refMols.get(r) ).toImg();
+				tableColumns[r] = new ImageIcon( refImg );
+				//molPanel.add( new JLabel( new ImageIcon(refImg) ), gbc );
 			} catch (CDKException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-		    
-		    
-	        
-	        molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
-	        gbc.gridx++;
+			
+			for( int d = 0; d < dbMols.size(); d++ ) {
+			
+				simHub.calculateSimilarity(refMols.get(r), dbMols.get(d));
+				
+				//IAtomContainer mol = mols.get(mi);
+				
+				try {
+					  /*
+					  if( mi == 0 ) {
+						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , Color.RED).withOuterGlowHighlight(2.0) ;
+					  } else {
+						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , Color.RED).withOuterGlowHighlight(2.0) ;
+					  }
+					  */ 
+					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
+			    	  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
+					  List<IAtomContainer> molPair = new ArrayList<IAtomContainer>(2);
+					  molPair.add(refMols.get(r) );
+					  molPair.add(dbMols.get(d) );
+			    	  bi = dptgen.depict( molPair ).toImg();
+					  
+					  //molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
+					  
+					  tableData[d][r] = new ImageIcon( bi );
+					  gbc.gridy++;
+								
+				} catch (CDKException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			  
+		        
+			}
+			
+			gbc.gridx++;
 		}
 		
-		molPanel.repaint();
-		molPanel.validate();
+		molPanel.getViewport().add( createMolTable(tableData, tableColumns));
+		//molPanel.repaint();
+		//molPanel.validate();
 	}
 	
 	
@@ -155,13 +201,10 @@ public class MCSGUIFrontend extends Frame {
 			
 			
 			// remove all molecules
-			molPanel.removeAll();
+			molPanel.getViewport().removeAll();
 			
-			List<IAtomContainer> mols = new ArrayList<IAtomContainer>(2);
-			mols.add( refMols.get(0) );
-			mols.add( dbMols.get(0) );
 			
-			addMoleculesToPanel( mols );
+			addMoleculesToPanel( );
 			
 		}
 		
@@ -202,7 +245,14 @@ public class MCSGUIFrontend extends Frame {
 	
 	JButton currentButton;
 	
-	JPanel molPanel;
+	JScrollPane molPanel;
+	Color[] mcsColours = {
+	  Color.RED,
+	  Color.BLUE,
+	  Color.MAGENTA,
+	  Color.CYAN,
+	  Color.GREEN
+	};
 	
 	JCheckBox outputMCS;
 	JCheckBox raymondHeuristicsComponent;
@@ -221,6 +271,8 @@ public class MCSGUIFrontend extends Frame {
     private int timeLimit = 10000;
 	private boolean ghostSubstructures = false;
 	private boolean bondWeightFlag = false;
+	
+	private int molHeight = 250, molWidth = 200;
 	
 	
 	public static ExtendedAlgorithm[] MappingAlgorithmNames = new ExtendedAlgorithm[] {
@@ -333,9 +385,10 @@ public class MCSGUIFrontend extends Frame {
         mainPanel.setLayout(new GridBagLayout() );
         mainPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        molPanel = new JPanel() ;
-        molPanel.setLayout(new GridBagLayout() );
-        molPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        molPanel = new JScrollPane() ;
+        molPanel.setMinimumSize( new Dimension(250, 500));
+        //molPanel.setLayout(new GridBagLayout() );
+        //molPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
         JTabbedPane tp = new JTabbedPane();  
         //tp.setLayout( new GridBagLayout()  );
@@ -389,11 +442,11 @@ public class MCSGUIFrontend extends Frame {
         
         
         gbc.gridx = 0;
-        //gbc.gridy = 0;
         ioPanel.add( loadMoleculesButtonComponent, gbc);
         gbc.gridy++;
         
         
+        gbc.gridy = 0;
         mcsSettingsPanel.add(new JLabel("search algorithm: "), gbc);
         gbc.gridy++;
         
@@ -421,18 +474,13 @@ public class MCSGUIFrontend extends Frame {
         mcsSettingsPanel.add(new JLabel("output MCS: "), gbc);
         gbc.gridy++;
         
-        mcsSettingsPanel.add(new JLabel("output ghost SMARTS: "), gbc);
-        gbc.gridy++;
+        //mcsSettingsPanel.add(new JLabel("output ghost SMARTS: "), gbc);
+        //gbc.gridy++;
         
         
         
         gbc.gridx = 1;
         gbc.gridy = 0;
-        //mainPanel.add( refMolColumnComponent, gbc );
-        gbc.gridy++;
-        
-        //mainPanel.add( databaseMolColumnComponent, gbc );
-        gbc.gridy++;
              
         mcsSettingsPanel.add( mappingAlgorithmComponent, gbc );
         gbc.gridy++;
@@ -461,8 +509,8 @@ public class MCSGUIFrontend extends Frame {
         mcsSettingsPanel.add( outputMCS, gbc );
         gbc.gridy++;
         
-        mcsSettingsPanel.add( detailedGhostInfoComponent, gbc );
-        gbc.gridy++;
+        //mcsSettingsPanel.add( detailedGhostInfoComponent, gbc );
+        //gbc.gridy++;
 		
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent windowEvent){
@@ -474,20 +522,33 @@ public class MCSGUIFrontend extends Frame {
         IChemObjectBuilder bldr   = SilentChemObjectBuilder.getInstance();
         SmilesParser       smipar = new SmilesParser(bldr);
         
+        refMols = new ArrayList<IAtomContainer>(1);
+        dbMols = new ArrayList<IAtomContainer>(1);
         
         IAtomContainer mol = null;
         BufferedImage bi = null;
 		try {
 			mol = smipar.parseSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine");
+			mol.setProperty(CDKConstants.TITLE, "caffeine"); // title already set from input!
+			refMols.add(mol);
 		} catch (InvalidSmilesException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-        mol.setProperty(CDKConstants.TITLE, "caffeine"); // title already set from input!
+		
+		try {
+			mol = smipar.parseSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)CC methylcaffeine");
+			//mol.setProperty(CDKConstants.TITLE, "caffeine"); // title already set from input!
+			dbMols.add(mol);
+		} catch (InvalidSmilesException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        
 
         DepictionGenerator dptgen = new DepictionGenerator();
         try {
-			 bi = dptgen.withSize(200, 250)              // px (raster) or mm (vector)
+			 bi = dptgen.withSize(molWidth, molHeight)               // px (raster) or mm (vector)
 			      .withMolTitle()
 			      .withTitleColor(Color.DARK_GRAY) // annotations are red by default
 			      .depict(mol).toImg();
@@ -498,12 +559,18 @@ public class MCSGUIFrontend extends Frame {
         
         gbc.gridx = 0;
         gbc.gridy = 0;
-        molPanel.setBackground(Color.red);
-        molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
+        //molPanel.setBackground(Color.red);
+        
+        Object[][] tData = new Object[][]{{ new ImageIcon(bi) }};
+        ImageIcon[] tCols = new ImageIcon[]{ new ImageIcon(bi) };
+        
+        addMoleculesToPanel( );
+        //molPanel.getViewport().add( createMolTable(tData, tCols) );
+        //molPanel.add( exampleTable, gbc );
         gbc.gridy++;
               
         
-        setSize(600,400);  
+        setSize(600,600);  
         setLayout( new GridBagLayout() );
         
         
@@ -524,6 +591,56 @@ public class MCSGUIFrontend extends Frame {
         
         setTitle("CheMCS GUI");
 		setVisible(true);  
+	}
+	
+	
+	private JTable createMolTable( Object[][] tD, ImageIcon[] tC ) {
+		DefaultTableModel model = new DefaultTableModel(tD, tC)
+        {
+            //  Returning the Class of each column will allow different
+            //  renderers to be used based on Class
+            public Class getColumnClass(int column)
+            {
+                return getValueAt(0, column).getClass();
+            }
+        };
+        
+        JTable molTable = new JTable( model );
+        //molTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer());
+        //exampleTable.setPreferredScrollableViewportSize(exampleTable.getPreferredSize());
+        molTable.setFillsViewportHeight(true);
+        molTable.setRowHeight(molHeight);
+        
+        JTableHeader header = molTable.getTableHeader();
+        //header.setBackground(Color.yellow);
+        header.setDefaultRenderer( new IconRenderer(tC) );
+        
+        return(molTable);
+	}
+	
+	class IconRenderer extends DefaultTableCellRenderer {
+		
+		public IconRenderer( ImageIcon[] tC ) {
+			super();
+			
+			colIcons = tC;
+		}
+		
+		  public Component getTableCellRendererComponent(JTable table, 
+		Object obj,boolean isSelected, boolean hasFocus, int row, 
+		int column) {
+		   
+		  setBorder(UIManager.getBorder("TableHeader.cellBorder"));
+		  setHorizontalAlignment(JLabel.CENTER);
+		  //System.out.println( "test " + obj.getClass() +  "  " + obj  );
+		  
+		  //setIcon( new ImageIcon("/home/edmund/git/Java_MCS_algorithms/data/output/chembl751606_aid466_decoys_r0_d0.png"));
+		  setIcon( colIcons[column] );
+		  
+		  return this;
+		  }
+		  
+		  ImageIcon[] colIcons;
 	}
 	
 	

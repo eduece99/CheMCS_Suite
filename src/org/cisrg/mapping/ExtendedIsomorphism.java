@@ -413,7 +413,7 @@ public class ExtendedIsomorphism implements Serializable {
         // translate and add all maps
         //mapChromosomesToMainMaps(mcs, mcs.getMainMol(), mcs.getQueryMol() );
 
-       // firstBondMCS = mcs.getBestBondMatches().get(0);
+        // firstBondMCS = mcs.getBestBondMatches().get(0);
         allBondMCS = mcs.getBestBondMatches();
         allBondIndexMCS = mcs.getBestBondIndexMatches(); 
      		   

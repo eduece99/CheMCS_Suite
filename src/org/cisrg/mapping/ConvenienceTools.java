@@ -1372,7 +1372,7 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 			at.setNotification(false);
 		}
 		
-		calculateImplicitHydrogens(common);
+		//calculateImplicitHydrogens(common);
 		
 		//System.out.println( "bitset - " + bondsPresent );
 		
