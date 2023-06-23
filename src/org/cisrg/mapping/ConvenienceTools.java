@@ -315,13 +315,17 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 	};
 	
 	
-	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator, boolean processCompounds ) throws IOException, FileNotFoundException {
+	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator, boolean processCompounds, int compoundLimit ) throws IOException, FileNotFoundException {
 		
-		
+		// default to impossibly large number
+		if( compoundLimit <= 0 )
+				compoundLimit = Integer.MAX_VALUE;
 		
 		DefaultIteratingChemObjectReader<IAtomContainer> isr = null;
-		ArrayList<IAtomContainer> queries = new ArrayList<IAtomContainer>(20);
+		ArrayList<IAtomContainer> queries = new ArrayList<IAtomContainer>(100);
 	
+		int counter = 0;
+		
 		/*
 		// Atom symbol to atomic number hash hack
 		HashMap<String, Integer> symbolToNumber = new HashMap<String, Integer>();
@@ -359,9 +363,9 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 			//System.err.println( "Error - molecule file contains no readable molecules" );
 			throw new IOException("Error - molecule file contains no readable molecules " + isr);
 		}
-		
+		 
 		// load the query molecules
-		while( isr.hasNext() ) {
+		while( isr.hasNext() && counter < compoundLimit ) {
 			try {
 				//queries[0] = new AtomContainer( sp.parseSmiles("ONC1C(CO)CCC1") );  // hyperstructure
 				//queries[1] = new AtomContainer( sp.parseSmiles("ONC1CCC(CCC)C1") );  // query
@@ -398,9 +402,7 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 					//att.assignAtomTypePropertiesToAtom(rdmol1);
 					//att.assignAtomTypePropertiesToAtom(rdmol2);
 					
-				
-			
-	
+					counter++;
 	
 			} catch( Exception e2 ) {
 				e2.printStackTrace();
@@ -430,7 +432,7 @@ public static void sortBySimilarityMCS( ArrayList<IAtomContainer> molecules ) {
 	}
 	
 	public static ArrayList<IAtomContainer> getQueryMolecules( File inputFile, Comparator<IAtomContainer> comparator ) throws IOException, FileNotFoundException {
-		return getQueryMolecules( inputFile, comparator, true );
+		return getQueryMolecules( inputFile, comparator, true, -1);
 	}
 	
 	

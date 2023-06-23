@@ -68,7 +68,7 @@ public class MCSCommandLine implements Callable<Integer> {
     	// get molecules
         ArrayList<IAtomContainer> compounds = null;
 		try {
-			compounds = ConvenienceTools.getQueryMolecules( new File( inputFileName ), null, true );
+			compounds = ConvenienceTools.getQueryMolecules( new File( inputFileName ), null, true, -1 );
 			//System.out.println( "compound file size - " + compounds.size() );
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

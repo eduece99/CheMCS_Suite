@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.swing.DefaultComboBoxModel;
@@ -28,7 +29,10 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
 import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SpinnerModel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.Border;
@@ -91,7 +95,7 @@ public class MCSGUIFrontend extends Frame {
         gbc.gridy = 0;
         
         ImageIcon[] tableColumns = new ImageIcon[refMols.size()] ;
-        Object[][] tableData = new Object[refMols.size()][dbMols.size()] ;
+        Object[][] tableData = new Object[dbMols.size()][refMols.size()] ;
 		
         // have ref molecules as columns, and db molecules as rows
 		for( int r = 0; r < refMols.size(); r++ ) {
@@ -119,11 +123,28 @@ public class MCSGUIFrontend extends Frame {
 						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , Color.RED).withOuterGlowHighlight(2.0) ;
 					  }
 					  */ 
+					 
+					  dptgen = dptgen.withTitleScale(1.2);
 					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
 			    	  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
 					  List<IAtomContainer> molPair = new ArrayList<IAtomContainer>(2);
 					  molPair.add(refMols.get(r) );
 					  molPair.add(dbMols.get(d) );
+					  
+					  String caption = "";
+					  if( similarityTypeComponent.getSelectedItem() == SimilarityType.Tanimoto ) {
+						  caption =  String.valueOf(simHub.tanimoto);
+					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.Tversky ) {
+						  caption =  String.valueOf(simHub.tversky);
+					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.MCSSize ) {
+						  caption =  String.valueOf(simHub.bondMaps.get(0).size() );
+					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.MCSTime ) {
+						  caption =  String.valueOf(simHub.mcsExecTime);
+					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.FragmentSizes ) {
+						  caption =  String.valueOf( Arrays.stream(simHub.fragmentSizes).boxed().toList() );
+					  }
+					  refMols.get(r).setProperty(CDKConstants.TITLE, caption );
+					  
 			    	  bi = dptgen.depict( molPair ).toImg();
 					  
 					  //molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
@@ -182,8 +203,11 @@ public class MCSGUIFrontend extends Frame {
 			// get molecules
 	        ArrayList<IAtomContainer> compounds = null;
 			try {
-				refMols = ConvenienceTools.getQueryMolecules( new File( refFileComponent.getText() ), null, true ); 
-				dbMols = ConvenienceTools.getQueryMolecules( new File( dbFileComponent.getText() ), null, true );
+				int refLim = (Integer) refMolLimComponent.getValue();
+				int dbLim = (Integer) dbMolLimComponent.getValue();
+				
+				refMols = ConvenienceTools.getQueryMolecules( new File( refFileComponent.getText() ), null, true, refLim ); 
+				dbMols = ConvenienceTools.getQueryMolecules( new File( dbFileComponent.getText() ), null, true, dbLim );
 				//System.out.println( "compound file size - " + compounds.size() );
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
@@ -239,6 +263,8 @@ public class MCSGUIFrontend extends Frame {
 	JTextField timeLimitComponent;
 	JTextField refFileComponent;
 	JTextField dbFileComponent;
+	JSpinner refMolLimComponent;
+	JSpinner dbMolLimComponent;
 	JButton refFileButtonComponent;
 	JButton dbFileButtonComponent;
 	JButton loadMoleculesButtonComponent;
@@ -272,7 +298,7 @@ public class MCSGUIFrontend extends Frame {
 	private boolean ghostSubstructures = false;
 	private boolean bondWeightFlag = false;
 	
-	private int molHeight = 250, molWidth = 200;
+	private int molHeight = 175, molWidth = 300;
 	
 	
 	public static ExtendedAlgorithm[] MappingAlgorithmNames = new ExtendedAlgorithm[] {
@@ -302,7 +328,7 @@ public class MCSGUIFrontend extends Frame {
 	
 	/** Enum for the similarity measure types. */
 	public enum SimilarityType { 
-		Tanimoto, Tversky, Number
+		Tanimoto, Tversky, MCSSize, MCSTime, FragmentSizes
 	}
 
 	public MCSGUIFrontend() {
@@ -336,6 +362,20 @@ public class MCSGUIFrontend extends Frame {
 		refFileButtonComponent = new JButton("Browse");
 		refFileButtonComponent.addActionListener( new FileButtonListener(refFileButtonComponent) );
 		
+		SpinnerModel refMolLimModel = new SpinnerNumberModel(5, //initial value
+                1, //min
+                5, //max
+                1);//step
+		
+		SpinnerModel dbMolLimModel = new SpinnerNumberModel(100, //initial value
+                1, //min
+                100, //max
+                1);//step
+
+
+		refMolLimComponent = new JSpinner(refMolLimModel);
+		dbMolLimComponent = new JSpinner(dbMolLimModel);
+		
 		dbFileComponent = new JTextField("input file path", 200); 
 		dbFileButtonComponent = new JButton("Browse");
 		dbFileButtonComponent.addActionListener( new FileButtonListener(dbFileButtonComponent) );
@@ -351,7 +391,7 @@ public class MCSGUIFrontend extends Frame {
        
         mappingAlgorithmComponent = new JComboBox( );
         mappingAlgorithmComponent.setModel( new DefaultComboBoxModel( MappingAlgorithmNames  ) );
-        mappingAlgorithmComponent.setSelectedIndex(1);
+        mappingAlgorithmComponent.setSelectedItem(ExtendedAlgorithm.Depolli_dMCES);
         
         aggregationMethodComponent = new JComboBox();
         aggregationMethodComponent.setModel( new DefaultComboBoxModel( AggregationMethod.values() ) );
@@ -387,6 +427,7 @@ public class MCSGUIFrontend extends Frame {
         
         molPanel = new JScrollPane() ;
         molPanel.setMinimumSize( new Dimension(250, 500));
+        
         //molPanel.setLayout(new GridBagLayout() );
         //molPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
@@ -410,12 +451,13 @@ public class MCSGUIFrontend extends Frame {
         //addTab("Settings", mainPanel);
         
         gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 0.2;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        ioPanel.add(new JLabel("reference CDK Column: "), gbc);
+        ioPanel.add(new JLabel("reference molecules: "), gbc);
         gbc.gridy++;
         
-        ioPanel.add(new JLabel("database CDK Column: "), gbc);
+        ioPanel.add(new JLabel("database molecules: "), gbc);
         gbc.gridy++;
         
         gbc.gridx = 1;
@@ -429,11 +471,19 @@ public class MCSGUIFrontend extends Frame {
         ioPanel.add( dbFileComponent, gbc);
         gbc.gridy++;
         
-        gbc.weightx = 0.3;
-        
+        gbc.weightx = 0.02;
         gbc.gridx = 2;
         gbc.gridy = 0;
+        ioPanel.add( refMolLimComponent, gbc);
+        gbc.gridy++;
         
+        ioPanel.add( dbMolLimComponent, gbc);
+        gbc.gridy++;
+        
+        
+        gbc.weightx = 0.05;
+        gbc.gridx = 3;
+        gbc.gridy = 0;
         ioPanel.add( refFileButtonComponent, gbc);
         gbc.gridy++;
         
@@ -578,15 +628,20 @@ public class MCSGUIFrontend extends Frame {
         
         gbc.gridx = 0;
         gbc.gridy = 0;
+        gbc.weighty = 0.8;
+        gbc.fill = gbc.BOTH;
         add( molPanel , gbc );
         
         gbc.gridx = 0;
         gbc.gridy = 1;
+        gbc.weighty = 0.01;
+        gbc.fill = gbc.HORIZONTAL;
         add( mainPanel , gbc );
         
         
         gbc.gridx = 0;
         gbc.gridy = 2;
+        gbc.weighty = 0.09;
         add( tp , gbc );
         
         setTitle("CheMCS GUI");
