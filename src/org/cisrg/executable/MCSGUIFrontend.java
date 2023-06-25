@@ -83,6 +83,26 @@ public class MCSGUIFrontend extends Frame {
 		);
 		
 		
+		// define molecule dimensions
+		switch( (MolRenderSize) molSizeComponent.getSelectedItem() ) {
+			case Small:
+				molWidth = 160;
+				molHeight = 100;
+				break;
+			case Medium:
+				molWidth = 300;
+				molHeight = 175;
+				break;
+			case Large:
+				molWidth = 400;
+				molHeight = 250;
+				break;
+			default:
+				molWidth = 160;
+				molHeight = 100;
+				break;
+		}
+				
 		
 		Image bi = null;
 		DepictionGenerator dptgen = new DepictionGenerator();
@@ -254,10 +274,11 @@ public class MCSGUIFrontend extends Frame {
 	}
 
 	
-	JComboBox mappingAlgorithmComponent;
-	JComboBox aggregationMethodComponent;
-	JComboBox returnTypeComponent;
-	JComboBox similarityTypeComponent;
+	JComboBox<ExtendedAlgorithm> mappingAlgorithmComponent;
+	JComboBox<String> aggregationMethodComponent;
+	JComboBox<String> returnTypeComponent;
+	JComboBox<String> similarityTypeComponent;
+	JComboBox<MolRenderSize> molSizeComponent;
 	
 	JTextField topoDistanceLimitComponent;
 	JTextField timeLimitComponent;
@@ -330,25 +351,14 @@ public class MCSGUIFrontend extends Frame {
 	public enum SimilarityType { 
 		Tanimoto, Tversky, MCSSize, MCSTime, FragmentSizes
 	}
+	
+	/** Enum for the molecule output sizes. */
+	public enum MolRenderSize { 
+		Small, Medium, Large
+	}
+	
 
 	public MCSGUIFrontend() {
-		
-		/*
-		refMolColumnComponent = new ColumnSelectionPanel( 
-    			(Border) null, 
-    			//new DataValueColumnFilter( StringValue.class ) ,
-    			new DataValueColumnFilter( CDKValue.class, SmartsValue.class ) ,
-    			//new DataValueColumnFilter( accepted ) ,
-    			false  // dummy column if true
-    	);
-        
-        databaseMolColumnComponent = new ColumnSelectionPanel( 
-    			(Border) null, 
-    			new DataValueColumnFilter( CDKValue.class ) ,
-    			//new DataValueColumnFilter( CDKNodeUtils.ACCEPTED_VALUE_CLASSES ) ,
-    			false  // dummy column if true
-    	);
-       */
 		
 		
 		ExtendedAlgorithm algorithm = ExtendedAlgorithm.valueOf(algorithmName);
@@ -389,16 +399,20 @@ public class MCSGUIFrontend extends Frame {
 		fc.addActionListener( new FileChooserListener( ) );
 		fc.addActionListener( new FileChooserListener( ) );
        
-        mappingAlgorithmComponent = new JComboBox( );
-        mappingAlgorithmComponent.setModel( new DefaultComboBoxModel( MappingAlgorithmNames  ) );
+        mappingAlgorithmComponent = new JComboBox<ExtendedAlgorithm>( );
+        mappingAlgorithmComponent.setModel( new DefaultComboBoxModel<ExtendedAlgorithm>( MappingAlgorithmNames  ) );
         mappingAlgorithmComponent.setSelectedItem(ExtendedAlgorithm.Depolli_dMCES);
         
-        aggregationMethodComponent = new JComboBox();
+        aggregationMethodComponent = new JComboBox<String>();
         aggregationMethodComponent.setModel( new DefaultComboBoxModel( AggregationMethod.values() ) );
         
-        similarityTypeComponent = new JComboBox();
+        similarityTypeComponent = new JComboBox<String>();
         similarityTypeComponent.setModel( new DefaultComboBoxModel( SimilarityType.values() ) );
         similarityTypeComponent.setSelectedIndex(0);
+        
+        molSizeComponent = new JComboBox<MolRenderSize>();
+        molSizeComponent.setModel( new DefaultComboBoxModel<MolRenderSize>( MolRenderSize.values() ) );
+        molSizeComponent.setSelectedIndex(1);
         
         outputMCS = new JCheckBox();
         outputMCS.setSelected(false);
@@ -433,31 +447,36 @@ public class MCSGUIFrontend extends Frame {
         
         JTabbedPane tp = new JTabbedPane();  
         //tp.setLayout( new GridBagLayout()  );
-        tp.setBounds(50,50,200,200);  
+        //tp.setBounds(50,50,200,200);  
         
-        JPanel ioPanel = new JPanel();  
-        ioPanel.setLayout(new GridBagLayout() );
+        JPanel inputPanel = new JPanel();  
+        inputPanel.setLayout(new GridBagLayout() );
+        
+        JPanel outputPanel = new JPanel();
+        outputPanel.setLayout(new GridBagLayout() );
         
         JPanel mcsSettingsPanel = new JPanel();  
         mcsSettingsPanel.setLayout(new GridBagLayout() );
         
         
         
-        tp.add("IO", ioPanel);
+        tp.add("Input", inputPanel);
+        tp.add("Output", outputPanel);
         tp.add("MCS", mcsSettingsPanel);
         
         
         
         //addTab("Settings", mainPanel);
         
+        // Input panel settings
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 0.2;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        ioPanel.add(new JLabel("reference molecules: "), gbc);
+        inputPanel.add(new JLabel("reference molecules: "), gbc);
         gbc.gridy++;
         
-        ioPanel.add(new JLabel("database molecules: "), gbc);
+        inputPanel.add(new JLabel("database molecules: "), gbc);
         gbc.gridy++;
         
         gbc.gridx = 1;
@@ -465,37 +484,54 @@ public class MCSGUIFrontend extends Frame {
         
         gbc.fill = GridBagConstraints.BOTH ;
         gbc.weightx = 0.8;
-        ioPanel.add( refFileComponent, gbc);
+        inputPanel.add( refFileComponent, gbc);
         gbc.gridy++;
         
-        ioPanel.add( dbFileComponent, gbc);
+        inputPanel.add( dbFileComponent, gbc);
         gbc.gridy++;
         
         gbc.weightx = 0.02;
         gbc.gridx = 2;
         gbc.gridy = 0;
-        ioPanel.add( refMolLimComponent, gbc);
+        inputPanel.add( refMolLimComponent, gbc);
         gbc.gridy++;
         
-        ioPanel.add( dbMolLimComponent, gbc);
+        inputPanel.add( dbMolLimComponent, gbc);
         gbc.gridy++;
         
         
         gbc.weightx = 0.05;
         gbc.gridx = 3;
         gbc.gridy = 0;
-        ioPanel.add( refFileButtonComponent, gbc);
+        inputPanel.add( refFileButtonComponent, gbc);
         gbc.gridy++;
         
-        ioPanel.add( dbFileButtonComponent, gbc);
+        inputPanel.add( dbFileButtonComponent, gbc);
         gbc.gridy++;
         
         
         gbc.gridx = 0;
-        ioPanel.add( loadMoleculesButtonComponent, gbc);
+        inputPanel.add( loadMoleculesButtonComponent, gbc);
+        gbc.gridy++;
+        
+        // Output panel settings
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        outputPanel.add(new JLabel("Molecule Size: "), gbc);
         gbc.gridy++;
         
         
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        
+        outputPanel.add( molSizeComponent, gbc);
+        gbc.gridy++;
+        
+        
+        
+        
+        // MCS settings panel
+        gbc.gridx = 0;
         gbc.gridy = 0;
         mcsSettingsPanel.add(new JLabel("search algorithm: "), gbc);
         gbc.gridy++;
@@ -620,7 +656,7 @@ public class MCSGUIFrontend extends Frame {
         gbc.gridy++;
               
         
-        setSize(600,600);  
+        setSize(600,800);  
         setLayout( new GridBagLayout() );
         
         
@@ -666,12 +702,14 @@ public class MCSGUIFrontend extends Frame {
         molTable.setFillsViewportHeight(true);
         molTable.setRowHeight(molHeight);
         
+        
         JTableHeader header = molTable.getTableHeader();
         //header.setBackground(Color.yellow);
         header.setDefaultRenderer( new IconRenderer(tC) );
         
         return(molTable);
 	}
+	
 	
 	class IconRenderer extends DefaultTableCellRenderer {
 		
@@ -691,11 +729,12 @@ public class MCSGUIFrontend extends Frame {
 		  
 		  //setIcon( new ImageIcon("/home/edmund/git/Java_MCS_algorithms/data/output/chembl751606_aid466_decoys_r0_d0.png"));
 		  setIcon( colIcons[column] );
+		  setSize(molWidth, molHeight);
 		  
 		  return this;
-		  }
+		}
 		  
-		  ImageIcon[] colIcons;
+		ImageIcon[] colIcons;
 	}
 	
 	
