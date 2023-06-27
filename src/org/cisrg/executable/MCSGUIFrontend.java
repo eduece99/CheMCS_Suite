@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Frame;
+import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
@@ -17,8 +18,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
+import javax.imageio.ImageIO;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -42,6 +45,13 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JFileChooser;
 
+import tech.tablesaw.api.DoubleColumn;
+import tech.tablesaw.api.IntColumn;
+import tech.tablesaw.api.LongColumn;
+import tech.tablesaw.api.StringColumn;
+import tech.tablesaw.api.Table;
+import tech.tablesaw.io.csv.CsvWriter;
+import tech.tablesaw.io.Destination;
 
 import org.cisrg.knime.GraphSimilarityNodeModel.AggregationMethod;
 import org.cisrg.knime.GraphSimilarityNodeModel.ReturnType;
@@ -66,8 +76,172 @@ import org.openscience.cdk.exception.InvalidSmilesException;
 public class MCSGUIFrontend extends Frame {
 	
 	
+
+	
+	JComboBox<ExtendedAlgorithm> mappingAlgorithmComponent;
+	JComboBox<String> aggregationMethodComponent;
+	JComboBox<String> returnTypeComponent;
+	JComboBox<String> similarityTypeComponent;
+	JComboBox<MolRenderSize> molSizeComponent;
+	
+	JTextField topoDistanceLimitComponent;
+	JTextField timeLimitComponent;
+	JTextField refFileComponent;
+	JTextField dbFileComponent;
+	JTextField exportTableFileComponent;
+	JTextField exportRenderFileComponent;
+	JSpinner refMolLimComponent;
+	JSpinner dbMolLimComponent;
+	
+	JButton refFileButtonComponent;
+	JButton dbFileButtonComponent;
+	JButton loadMoleculesButtonComponent;
+	JButton tableBrowseButtonComponent;
+	JButton renderBrowseButtonComponent;
+	JButton exportTableButtonComponent;
+	JButton exportRenderButtonComponent;
+	
+	JButton currentButton;
+	
+	JScrollPane molPanel;
+	Color[] mcsColours = {
+	  Color.RED,
+	  Color.BLUE,
+	  Color.MAGENTA,
+	  Color.CYAN,
+	  Color.GREEN
+	};
+	
+	JCheckBox outputMCS;
+	JCheckBox raymondHeuristicsComponent;
+	JCheckBox ringHeuristicsComponent;
+	JCheckBox detailedGhostInfoComponent;
+	
+	List<IAtomContainer> refMols, dbMols;
+	
+	final JFileChooser fc;
+	
+	SimilarityComparator simHub = null;
+	private String algorithmName = "Depolli_dMCES";
+    private int topologicalDistanceLimit = 4;
+    private boolean ringHeuristics = false;
+    private boolean raymondHeuristics = false;
+    private int timeLimit = 10000;
+	private boolean ghostSubstructures = false;
+	private boolean bondWeightFlag = false;
+	
+	private int molHeight = 175, molWidth = 300;
+	
+	
+	
+	
+	public static ExtendedAlgorithm[] MappingAlgorithmNames = new ExtendedAlgorithm[] {
+			ExtendedAlgorithm.DEFAULT,
+			ExtendedAlgorithm.CDKMCS,
+			ExtendedAlgorithm.VFLibMCS,
+			ExtendedAlgorithm.MCSPlus,
+			ExtendedAlgorithm.ChemAxon_cMCES,
+			ExtendedAlgorithm.ChemAxon_dMCES,
+			ExtendedAlgorithm.consR_dMCES,
+			ExtendedAlgorithm.BK_dMCES,
+			ExtendedAlgorithm.BK_cMCES,
+			ExtendedAlgorithm.CP_dMCES,
+			ExtendedAlgorithm.RASCAL_dMCES,
+			ExtendedAlgorithm.Depolli_dMCES,
+			ExtendedAlgorithm.kCombu_dMCES,
+			ExtendedAlgorithm.kCombu_cMCES,
+			ExtendedAlgorithm.fMCS
+		};
+		
+
+	/** Enum for the different aggregation methods. */
+	public enum AggregationMethod {
+		Minimum, Maximum, Average, Matrix
+	}
+	
+	
+	/** Enum for the similarity measure types. */
+	public enum SimilarityType { 
+		Tanimoto, Tversky, MCSSize, MCSTime, FragmentSizes
+	}
+	
+	/** Enum for the molecule output sizes. */
+	public enum MolRenderSize { 
+		Small, Medium, Large
+	}
+	
+	
+	
+	
+	private StringColumn refNameCol;
+	private StringColumn dbNameCol;
+	private StringColumn mcsSMARTSCol;
+	private IntColumn mcsSizeCol;
+	private DoubleColumn mcsTanimotoCol;
+	private DoubleColumn mcsTverskyCol;
+	private StringColumn fragmentSizesCol;
+	private IntColumn mcsTimeCol;
+	
+	private Collection<String> tbRefNames, tbDbNames, tbMcsSMARTS, tbFragmentSizes;
+	private Collection<Integer> tbMcsSizes, tbMcsTimes;
+	private Collection<Double> tbMcsTanimoto, tbMcsTversky;
+	
+
+	
+	/**
+	 * Output Table
+	 * 
+	 * Table :
+	 * - each row contains:
+	 * -- ref mol name
+	 * -- db mol name
+	 * -- MCS SMARTS
+	 * -- MCS size
+	 * -- Tanimoto similarity
+	 * -- Tversky similarity
+	 * -- Fragment sizes in MCS
+	 * -- MCS time
+	 * 
+	 * If you want ref mols and db mols as columns and rows respectively, use 
+	 * a competent data science tool (like python pandas) to pivot accordingly.
+	 */
+	private void exportTableDelim() {
+		refNameCol = StringColumn.create( "reference", tbRefNames );
+		dbNameCol = StringColumn.create( "database", tbDbNames );
+		mcsSMARTSCol = StringColumn.create( "MCS_SMARTS", tbMcsSMARTS );
+		mcsSizeCol = IntColumn.create( "MCS_bondcount", tbMcsSizes.toArray(new Integer[1]) );
+		mcsTanimotoCol = DoubleColumn.create( "tanimoto", tbMcsTanimoto );
+		mcsTverskyCol= DoubleColumn.create( "tversky", tbMcsTversky );
+		fragmentSizesCol = StringColumn.create( "fragment_sizes", tbFragmentSizes );
+		mcsTimeCol = IntColumn.create( "MCS_Time", tbMcsTimes.toArray(new Integer[1]) );
+		
+
+		Table mcsPairStats =
+		    Table.create("MCS Pair Stats")
+		        .addColumns( refNameCol, dbNameCol, mcsSMARTSCol, mcsSizeCol, 
+		        		mcsTanimotoCol, mcsTverskyCol, fragmentSizesCol, mcsTimeCol
+		        );
+		
+		System.out.println("Table Output:");
+		//System.out.println( mcsPairStats );
+		CsvWriter csvWriter = new CsvWriter();
+		csvWriter.write(mcsPairStats, new Destination( new File( exportTableFileComponent.getText() ) ) );
+				
+	}
+	
+	
+	
 	private void addMoleculesToPanel() {
 		
+		
+		tbRefNames = new ArrayList<String>();
+		tbDbNames = new ArrayList<String>();
+		tbMcsSMARTS = new ArrayList<String>();
+		tbFragmentSizes = new ArrayList<String>(); 
+		tbMcsSizes = new ArrayList<Integer>();
+		tbMcsTimes = new ArrayList<Integer>();
+		tbMcsTanimoto = new ArrayList<Double>();
+		tbMcsTversky = new ArrayList<Double>();
 		
 		algorithmName = mappingAlgorithmComponent.getSelectedItem().toString();
 	    topologicalDistanceLimit = Integer.parseInt( topoDistanceLimitComponent.getText() );
@@ -165,6 +339,17 @@ public class MCSGUIFrontend extends Frame {
 					  }
 					  refMols.get(r).setProperty(CDKConstants.TITLE, caption );
 					  
+					  // Table information
+					  tbRefNames.add( refMols.get(r).getTitle() );
+					  tbDbNames.add( dbMols.get(r).getTitle() );
+					  tbMcsSMARTS.add( simHub.mcsSMARTS );
+					  tbFragmentSizes.add( String.valueOf( Arrays.stream(simHub.fragmentSizes).boxed().toList() ) ); 
+					  tbMcsSizes.add( simHub.bondMaps.get(0).size() );
+					  tbMcsTimes.add( Integer.valueOf( (int) simHub.mcsExecTime ) );
+					  tbMcsTanimoto.add( simHub.tanimoto );
+					  tbMcsTversky.add( simHub.tversky );
+					  
+					  
 			    	  bi = dptgen.depict( molPair ).toImg();
 					  
 					  //molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
@@ -183,9 +368,40 @@ public class MCSGUIFrontend extends Frame {
 			gbc.gridx++;
 		}
 		
+		
 		molPanel.getViewport().add( createMolTable(tableData, tableColumns));
 		//molPanel.repaint();
 		//molPanel.validate();
+		
+		
+	}
+	
+
+	private JTable createMolTable( Object[][] tD, ImageIcon[] tC ) {
+		DefaultTableModel model = new DefaultTableModel(tD, tC)
+        {
+            //  Returning the Class of each column will allow different
+            //  renderers to be used based on Class
+            public Class getColumnClass(int column)
+            {
+                return getValueAt(0, column).getClass();
+            }
+        };
+        
+        JTable molTable = new JTable( model );
+        //molTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer());
+        //exampleTable.setPreferredScrollableViewportSize(exampleTable.getPreferredSize());
+        molTable.setFillsViewportHeight(true);
+        molTable.setRowHeight(molHeight);
+        
+        
+        JTableHeader header = molTable.getTableHeader();
+        //header.setBackground(Color.yellow);
+        header.setDefaultRenderer( new IconRenderer(tC) );
+        
+        molTable.setMaximumSize( new Dimension( 600, 700));
+        
+        return(molTable);
 	}
 	
 	
@@ -218,7 +434,6 @@ public class MCSGUIFrontend extends Frame {
 		
 		@Override
 		public void actionPerformed(ActionEvent ev) {
-			// TODO Auto-generated method stub
 			
 			// get molecules
 	        ArrayList<IAtomContainer> compounds = null;
@@ -254,6 +469,26 @@ public class MCSGUIFrontend extends Frame {
 		
 	}
 	
+	class ExportTableButtonListener implements ActionListener {
+		
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			exportTableDelim();
+		}
+		
+	}
+	
+	
+class ExportRenderButtonListener implements ActionListener {
+		
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			outputComponentImage( molPanel );
+		}
+		
+	}
+
+	
 	class FileChooserListener implements ActionListener {
 		
 		@Override
@@ -264,99 +499,19 @@ public class MCSGUIFrontend extends Frame {
 				refFileComponent.setText( fc.getSelectedFile().getAbsolutePath() );
 			} else if( currentButton == dbFileButtonComponent ) {
 				dbFileComponent.setText( fc.getSelectedFile().getAbsolutePath() );
+			} else if( currentButton == tableBrowseButtonComponent ) {
+				exportTableFileComponent.setText( fc.getSelectedFile().getAbsolutePath() );
+			} else if( currentButton == renderBrowseButtonComponent ) {
+				exportRenderFileComponent.setText( fc.getSelectedFile().getAbsolutePath() );
 			} else {
 				System.out.println("No file path saved." + currentButton );
-				
-				
 			}
+			
+			
 		}
 		
 	}
 
-	
-	JComboBox<ExtendedAlgorithm> mappingAlgorithmComponent;
-	JComboBox<String> aggregationMethodComponent;
-	JComboBox<String> returnTypeComponent;
-	JComboBox<String> similarityTypeComponent;
-	JComboBox<MolRenderSize> molSizeComponent;
-	
-	JTextField topoDistanceLimitComponent;
-	JTextField timeLimitComponent;
-	JTextField refFileComponent;
-	JTextField dbFileComponent;
-	JSpinner refMolLimComponent;
-	JSpinner dbMolLimComponent;
-	JButton refFileButtonComponent;
-	JButton dbFileButtonComponent;
-	JButton loadMoleculesButtonComponent;
-	
-	JButton currentButton;
-	
-	JScrollPane molPanel;
-	Color[] mcsColours = {
-	  Color.RED,
-	  Color.BLUE,
-	  Color.MAGENTA,
-	  Color.CYAN,
-	  Color.GREEN
-	};
-	
-	JCheckBox outputMCS;
-	JCheckBox raymondHeuristicsComponent;
-	JCheckBox ringHeuristicsComponent;
-	JCheckBox detailedGhostInfoComponent;
-	
-	List<IAtomContainer> refMols, dbMols;
-	
-	final JFileChooser fc;
-	
-	SimilarityComparator simHub = null;
-	private String algorithmName = "Depolli_dMCES";
-    private int topologicalDistanceLimit = 4;
-    private boolean ringHeuristics = false;
-    private boolean raymondHeuristics = false;
-    private int timeLimit = 10000;
-	private boolean ghostSubstructures = false;
-	private boolean bondWeightFlag = false;
-	
-	private int molHeight = 175, molWidth = 300;
-	
-	
-	public static ExtendedAlgorithm[] MappingAlgorithmNames = new ExtendedAlgorithm[] {
-			ExtendedAlgorithm.DEFAULT,
-			ExtendedAlgorithm.CDKMCS,
-			ExtendedAlgorithm.VFLibMCS,
-			ExtendedAlgorithm.MCSPlus,
-			ExtendedAlgorithm.ChemAxon_cMCES,
-			ExtendedAlgorithm.ChemAxon_dMCES,
-			ExtendedAlgorithm.consR_dMCES,
-			ExtendedAlgorithm.BK_dMCES,
-			ExtendedAlgorithm.BK_cMCES,
-			ExtendedAlgorithm.CP_dMCES,
-			ExtendedAlgorithm.RASCAL_dMCES,
-			ExtendedAlgorithm.Depolli_dMCES,
-			ExtendedAlgorithm.kCombu_dMCES,
-			ExtendedAlgorithm.kCombu_cMCES,
-			ExtendedAlgorithm.fMCS
-		};
-		
-
-	/** Enum for the different aggregation methods. */
-	public enum AggregationMethod {
-		Minimum, Maximum, Average, Matrix
-	}
-	
-	
-	/** Enum for the similarity measure types. */
-	public enum SimilarityType { 
-		Tanimoto, Tversky, MCSSize, MCSTime, FragmentSizes
-	}
-	
-	/** Enum for the molecule output sizes. */
-	public enum MolRenderSize { 
-		Small, Medium, Large
-	}
-	
 
 	public MCSGUIFrontend() {
 		
@@ -393,6 +548,14 @@ public class MCSGUIFrontend extends Frame {
 		
 		loadMoleculesButtonComponent = new JButton("Load Molecules");
 		loadMoleculesButtonComponent.addActionListener( new LoadMoleculesButtonListener() );
+		
+		exportTableFileComponent = new JTextField("table file path", 200); 
+		tableBrowseButtonComponent = new JButton("Browse");
+		tableBrowseButtonComponent.addActionListener( new FileButtonListener(tableBrowseButtonComponent) );
+		
+		exportRenderFileComponent = new JTextField("render file path", 200); 
+		renderBrowseButtonComponent = new JButton("Browse");
+		renderBrowseButtonComponent.addActionListener( new FileButtonListener(renderBrowseButtonComponent) );
 		
 		
 		fc = new JFileChooser();
@@ -431,7 +594,13 @@ public class MCSGUIFrontend extends Frame {
         
         detailedGhostInfoComponent = new JCheckBox(); 
         detailedGhostInfoComponent.setSelected(false);
-        		
+        
+        exportTableButtonComponent = new JButton("Export as CSV");
+        exportTableButtonComponent.addActionListener( new ExportTableButtonListener() );		
+        
+        exportRenderButtonComponent = new JButton("Render to...");
+        exportRenderButtonComponent.addActionListener( new ExportRenderButtonListener() );		
+        
         
         GridBagConstraints gbc = new GridBagConstraints();
         
@@ -514,10 +683,26 @@ public class MCSGUIFrontend extends Frame {
         inputPanel.add( loadMoleculesButtonComponent, gbc);
         gbc.gridy++;
         
+        
+        
+        
         // Output panel settings
         gbc.gridx = 0;
         gbc.gridy = 0;
         outputPanel.add(new JLabel("Molecule Size: "), gbc);
+        gbc.gridy++;
+        
+        outputPanel.add(new JLabel("aggregation method: "), gbc);
+        gbc.gridy++;
+        
+        outputPanel.add(new JLabel("similarity equation: "), gbc);
+        gbc.gridy++;
+        
+        gbc.weightx = 0.2;
+        outputPanel.add(exportRenderButtonComponent, gbc);
+        gbc.gridy++;
+        
+        outputPanel.add(exportTableButtonComponent, gbc);
         gbc.gridy++;
         
         
@@ -527,7 +712,24 @@ public class MCSGUIFrontend extends Frame {
         outputPanel.add( molSizeComponent, gbc);
         gbc.gridy++;
         
+        outputPanel.add( aggregationMethodComponent, gbc );
+        gbc.gridy++;
         
+        outputPanel.add( similarityTypeComponent, gbc );
+        gbc.gridy++;
+        
+        gbc.weightx = 0.6;
+        outputPanel.add( exportRenderFileComponent, gbc );
+        gbc.gridy++;       
+        
+        outputPanel.add( exportTableFileComponent, gbc );
+        gbc.gridy--;
+        
+        gbc.gridx = 2;
+        gbc.weightx = 0.2;
+        outputPanel.add( renderBrowseButtonComponent, gbc );
+        gbc.gridy++;
+        outputPanel.add( tableBrowseButtonComponent, gbc );
         
         
         // MCS settings panel
@@ -536,14 +738,6 @@ public class MCSGUIFrontend extends Frame {
         mcsSettingsPanel.add(new JLabel("search algorithm: "), gbc);
         gbc.gridy++;
         
-        mcsSettingsPanel.add(new JLabel("aggregation method: "), gbc);
-        gbc.gridy++;
-        
-        //mainPanel.add(new JLabel("return method: "), gbc);
-        //gbc.gridy++;
-        
-        mcsSettingsPanel.add(new JLabel("similarity equation: "), gbc);
-        gbc.gridy++;
         
         mcsSettingsPanel.add(new JLabel("Modular Product heuristics: "), gbc);
         gbc.gridy++;
@@ -557,8 +751,7 @@ public class MCSGUIFrontend extends Frame {
         mcsSettingsPanel.add(new JLabel("expansion time limit: "), gbc);
         gbc.gridy++;
         
-        mcsSettingsPanel.add(new JLabel("output MCS: "), gbc);
-        gbc.gridy++;
+        
         
         //mcsSettingsPanel.add(new JLabel("output ghost SMARTS: "), gbc);
         //gbc.gridy++;
@@ -571,14 +764,10 @@ public class MCSGUIFrontend extends Frame {
         mcsSettingsPanel.add( mappingAlgorithmComponent, gbc );
         gbc.gridy++;
         
-        mcsSettingsPanel.add( aggregationMethodComponent, gbc );
-        gbc.gridy++;
         
         //mainPanel.add( returnTypeComponent, gbc );
         //gbc.gridy++;
-        
-        mcsSettingsPanel.add( similarityTypeComponent, gbc );
-        gbc.gridy++;
+
         
         mcsSettingsPanel.add( raymondHeuristicsComponent, gbc );
         gbc.gridy++;
@@ -592,8 +781,6 @@ public class MCSGUIFrontend extends Frame {
         mcsSettingsPanel.add( timeLimitComponent, gbc );
         gbc.gridy++;
         
-        mcsSettingsPanel.add( outputMCS, gbc );
-        gbc.gridy++;
         
         //mcsSettingsPanel.add( detailedGhostInfoComponent, gbc );
         //gbc.gridy++;
@@ -682,32 +869,25 @@ public class MCSGUIFrontend extends Frame {
         
         setTitle("CheMCS GUI");
 		setVisible(true);  
+		
+		outputComponentImage( molPanel );
+		
+		
 	}
 	
 	
-	private JTable createMolTable( Object[][] tD, ImageIcon[] tC ) {
-		DefaultTableModel model = new DefaultTableModel(tD, tC)
-        {
-            //  Returning the Class of each column will allow different
-            //  renderers to be used based on Class
-            public Class getColumnClass(int column)
-            {
-                return getValueAt(0, column).getClass();
-            }
-        };
+	private void outputComponentImage( Component cmp ) {
+		
+		BufferedImage image = new BufferedImage(cmp.getWidth(), cmp.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        cmp.printAll(g);
+        g.dispose();
+        try { 
+            ImageIO.write(image, "png", new File( exportRenderFileComponent.getText() ) ); 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         
-        JTable molTable = new JTable( model );
-        //molTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer());
-        //exampleTable.setPreferredScrollableViewportSize(exampleTable.getPreferredSize());
-        molTable.setFillsViewportHeight(true);
-        molTable.setRowHeight(molHeight);
-        
-        
-        JTableHeader header = molTable.getTableHeader();
-        //header.setBackground(Color.yellow);
-        header.setDefaultRenderer( new IconRenderer(tC) );
-        
-        return(molTable);
 	}
 	
 	
@@ -730,6 +910,7 @@ public class MCSGUIFrontend extends Frame {
 		  //setIcon( new ImageIcon("/home/edmund/git/Java_MCS_algorithms/data/output/chembl751606_aid466_decoys_r0_d0.png"));
 		  setIcon( colIcons[column] );
 		  setSize(molWidth, molHeight);
+		  setMaximumSize( new Dimension( molWidth, molHeight ) );
 		  
 		  return this;
 		}

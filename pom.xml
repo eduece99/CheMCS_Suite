@@ -128,5 +128,10 @@
 	    <artifactId>guava</artifactId>
 	    <version>31.1-jre</version>
 	</dependency>
+	<dependency>
+	    <groupId>tech.tablesaw</groupId>
+	    <artifactId>tablesaw-core</artifactId>
+	    <version>LATEST</version>
+	</dependency>
   </dependencies>
 </project>

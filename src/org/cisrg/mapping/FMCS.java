@@ -752,7 +752,7 @@ public class FMCS extends MCSMethods {
 		public IAtomContainer getAtomContainer() {
 			if( container == null ) {
 				container = ConvenienceTools.createSubgraph(mol1, internalBonds);
-				ConvenienceTools.calculateImplicitHydrogens(container);
+				//ConvenienceTools.calculateImplicitHydrogens(container);
 			}
 			
 			return container;
