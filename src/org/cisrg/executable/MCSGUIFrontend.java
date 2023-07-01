@@ -1,24 +1,29 @@
 package org.cisrg.executable;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Frame;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.beans.PropertyChangeEvent;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -26,6 +31,7 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
+import javax.swing.table.TableColumn;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -34,7 +40,11 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
+import javax.swing.ProgressMonitor;
+import javax.swing.ScrollPaneConstants;
+import javax.swing.ScrollPaneLayout;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingWorker;
 import javax.swing.SpinnerModel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -44,6 +54,7 @@ import javax.swing.JButton;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JFileChooser;
+import javax.swing.JDialog;
 
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.IntColumn;
@@ -102,6 +113,13 @@ public class MCSGUIFrontend extends Frame {
 	JButton exportRenderButtonComponent;
 	
 	JButton currentButton;
+	
+	JDialog mcsProgressDialog ;
+	JLabel mcsProgressLabel ;
+	
+	//ProgressMonitor mcsProgressMonitor;
+	int maxProgress = 1000;
+	
 	
 	JScrollPane molPanel;
 	Color[] mcsColours = {
@@ -173,6 +191,8 @@ public class MCSGUIFrontend extends Frame {
 	
 	
 	
+	
+	
 	private StringColumn refNameCol;
 	private StringColumn dbNameCol;
 	private StringColumn mcsSMARTSCol;
@@ -185,7 +205,149 @@ public class MCSGUIFrontend extends Frame {
 	private Collection<String> tbRefNames, tbDbNames, tbMcsSMARTS, tbFragmentSizes;
 	private Collection<Integer> tbMcsSizes, tbMcsTimes;
 	private Collection<Double> tbMcsTanimoto, tbMcsTversky;
+	private ProgressMonitor mcsProgressMonitor;
 	
+	
+	class MCSTask extends SwingWorker<Void, Void> {
+		
+		private ImageIcon[] tableColumns ;
+        private Object[][] tableData;
+        
+        public MCSTask( ImageIcon[] tc, Object[][] td) {
+        	super();
+        	
+        	this.tableColumns = tc;
+        	this.tableData = td;
+        }
+        
+        public Object[][] getTableData() {
+        	return tableData;
+        }
+        
+        @Override
+        public Void doInBackground() {
+            
+        	
+        	Image bi = null;
+    		DepictionGenerator dptgen = new DepictionGenerator();
+    		dptgen = dptgen.withSize(molWidth, molHeight)             
+    			      .withMolTitle()
+    			      .withTitleColor(Color.DARK_GRAY); 
+    		
+    		int maxMolCount = refMols.size() * dbMols.size() ;
+
+            // have ref molecules as columns, and db molecules as rows
+    		for( int r = 0; r < refMols.size(); r++ ) {
+    			
+    			try {
+    				Image refImg = dptgen.depict( refMols.get(r) ).toImg();
+    				tableColumns[r] = new ImageIcon( refImg );
+    				//molPanel.add( new JLabel( new ImageIcon(refImg) ), gbc );
+    			} catch (CDKException e) {
+    				// TODO Auto-generated catch block
+    				e.printStackTrace();
+    			}
+    			
+    			for( int d = 0; d < dbMols.size() && ! mcsProgressMonitor.isCanceled() ; d++ ) {
+    			
+    				simHub.calculateSimilarity(refMols.get(r), dbMols.get(d));
+    				
+    				//IAtomContainer mol = mols.get(mi);
+    				
+    				try {
+    					  /*
+    					  if( mi == 0 ) {
+    						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , Color.RED).withOuterGlowHighlight(2.0) ;
+    					  } else {
+    						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , Color.RED).withOuterGlowHighlight(2.0) ;
+    					  }
+    					  */ 
+    					 
+    					  dptgen = dptgen.withTitleScale(1.2);
+    					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
+    			    	  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
+    					  List<IAtomContainer> molPair = new ArrayList<IAtomContainer>(2);
+    					  molPair.add(refMols.get(r) );
+    					  molPair.add(dbMols.get(d) );
+    					  
+    					  String caption = "no caption";
+    					  if( similarityTypeComponent.getSelectedItem() == SimilarityType.Tanimoto ) {
+    						  caption =  String.valueOf(simHub.tanimoto);
+    					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.Tversky ) {
+    						  caption =  String.valueOf(simHub.tversky);
+    					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.MCSSize ) {
+    						  caption =  String.valueOf(simHub.bondMaps.get(0).size() );
+    					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.MCSTime ) {
+    						  caption =  String.valueOf(simHub.mcsExecTime);
+    					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.FragmentSizes ) {
+    						  caption =  String.valueOf( Arrays.stream(simHub.fragmentSizes).boxed().toList() );
+    					  }
+    					  //refMols.get(r).setProperty(CDKConstants.TITLE, caption );
+    					  
+    					  // Table information
+    					  tbRefNames.add( refMols.get(r).getTitle() );
+    					  tbDbNames.add( dbMols.get(r).getTitle() );
+    					  tbMcsSMARTS.add( simHub.mcsSMARTS );
+    					  tbFragmentSizes.add( String.valueOf( Arrays.stream(simHub.fragmentSizes).boxed().toList() ) ); 
+    					  tbMcsSizes.add( simHub.bondMaps.get(0).size() );
+    					  tbMcsTimes.add( Integer.valueOf( (int) simHub.mcsExecTime ) );
+    					  tbMcsTanimoto.add( simHub.tanimoto );
+    					  tbMcsTversky.add( simHub.tversky );
+    					  
+    					  
+    			    	  bi = dptgen.depict( molPair ).toImg();
+    			    	  
+    			    	  Graphics2D biG = (Graphics2D) bi.getGraphics();
+    			    	  //biG.setFont(new Font("TimesRoman", Font.PLAIN, 12)); 
+    			    	  int noImgWidth = biG.getFontMetrics().stringWidth(caption);
+    			    	  biG.setPaint(Color.BLACK);
+    			    	  biG.drawString(caption, (molWidth - noImgWidth) / 2, molHeight - 5);
+    					  
+    					  //molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
+    					  
+    					  tableData[d][r] = new ImageIcon( bi );
+    					  
+    					  
+    					  float progressIndicator = ( (float) tbMcsSMARTS.size() / maxMolCount ) * maxProgress ;
+    					  mcsProgressMonitor.setProgress( Math.round(progressIndicator) );
+    					  
+    					  mcsProgressLabel.setText("this is molecule " + (r * d) );
+    					  mcsProgressDialog.validate();
+    					  
+    					  //System.out.println( mcsProgressMonitor.isCanceled() );
+    					  
+    				} catch (CDKException e) {
+    					// TODO Auto-generated catch block
+    					e.printStackTrace();
+    				}
+    			  
+    		        
+    			}
+    			
+    			//gbc.gridx++;
+    		}
+    		
+    		
+            return null;
+        }
+
+        @Override
+        public void done() {
+            //Toolkit.getDefaultToolkit().beep();
+            //startButton.setEnabled(true);
+            mcsProgressMonitor.setProgress(0);
+            mcsProgressMonitor.close();
+            
+            System.out.println("MCS calc done " + tableData[0][0] );
+    		
+    		molPanel.getViewport().add( createMolTable(tableData, tableColumns));
+    		
+    		
+    		molPanel.repaint();
+    		molPanel.validate();
+        }
+        
+    }
 
 	
 	/**
@@ -278,101 +440,41 @@ public class MCSGUIFrontend extends Frame {
 		}
 				
 		
-		Image bi = null;
-		DepictionGenerator dptgen = new DepictionGenerator();
-		dptgen = dptgen.withSize(molWidth, molHeight)             
-			      .withMolTitle()
-			      .withTitleColor(Color.DARK_GRAY); 
 		
-		GridBagConstraints gbc = new GridBagConstraints();
-	    gbc.gridx = 0;
-        gbc.gridy = 0;
-        
         ImageIcon[] tableColumns = new ImageIcon[refMols.size()] ;
         Object[][] tableData = new Object[dbMols.size()][refMols.size()] ;
+        
+        
+        
+        //mcsProgressDialog.setVisible(true);
 		
-        // have ref molecules as columns, and db molecules as rows
-		for( int r = 0; r < refMols.size(); r++ ) {
-			
-			try {
-				Image refImg = dptgen.depict( refMols.get(r) ).toImg();
-				tableColumns[r] = new ImageIcon( refImg );
-				//molPanel.add( new JLabel( new ImageIcon(refImg) ), gbc );
-			} catch (CDKException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-			for( int d = 0; d < dbMols.size(); d++ ) {
-			
-				simHub.calculateSimilarity(refMols.get(r), dbMols.get(d));
-				
-				//IAtomContainer mol = mols.get(mi);
-				
-				try {
-					  /*
-					  if( mi == 0 ) {
-						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , Color.RED).withOuterGlowHighlight(2.0) ;
-					  } else {
-						  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , Color.RED).withOuterGlowHighlight(2.0) ;
-					  }
-					  */ 
-					 
-					  dptgen = dptgen.withTitleScale(1.2);
-					  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).keySet() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
-			    	  dptgen = dptgen.withHighlight( simHub.bondMaps.get(0).values() , mcsColours[r] ).withOuterGlowHighlight(2.0) ;
-					  List<IAtomContainer> molPair = new ArrayList<IAtomContainer>(2);
-					  molPair.add(refMols.get(r) );
-					  molPair.add(dbMols.get(d) );
-					  
-					  String caption = "";
-					  if( similarityTypeComponent.getSelectedItem() == SimilarityType.Tanimoto ) {
-						  caption =  String.valueOf(simHub.tanimoto);
-					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.Tversky ) {
-						  caption =  String.valueOf(simHub.tversky);
-					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.MCSSize ) {
-						  caption =  String.valueOf(simHub.bondMaps.get(0).size() );
-					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.MCSTime ) {
-						  caption =  String.valueOf(simHub.mcsExecTime);
-					  } else if( similarityTypeComponent.getSelectedItem() == SimilarityType.FragmentSizes ) {
-						  caption =  String.valueOf( Arrays.stream(simHub.fragmentSizes).boxed().toList() );
-					  }
-					  refMols.get(r).setProperty(CDKConstants.TITLE, caption );
-					  
-					  // Table information
-					  tbRefNames.add( refMols.get(r).getTitle() );
-					  tbDbNames.add( dbMols.get(r).getTitle() );
-					  tbMcsSMARTS.add( simHub.mcsSMARTS );
-					  tbFragmentSizes.add( String.valueOf( Arrays.stream(simHub.fragmentSizes).boxed().toList() ) ); 
-					  tbMcsSizes.add( simHub.bondMaps.get(0).size() );
-					  tbMcsTimes.add( Integer.valueOf( (int) simHub.mcsExecTime ) );
-					  tbMcsTanimoto.add( simHub.tanimoto );
-					  tbMcsTversky.add( simHub.tversky );
-					  
-					  
-			    	  bi = dptgen.depict( molPair ).toImg();
-					  
-					  //molPanel.add( new JLabel( new ImageIcon(bi) ), gbc );
-					  
-					  tableData[d][r] = new ImageIcon( bi );
-					  gbc.gridy++;
-								
-				} catch (CDKException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			  
-		        
-			}
-			
-			gbc.gridx++;
-		}
-		
-		
-		molPanel.getViewport().add( createMolTable(tableData, tableColumns));
-		//molPanel.repaint();
-		//molPanel.validate();
-		
+        mcsProgressMonitor = new ProgressMonitor( this,
+                "Calculating MCS pairs for input molecule(s)...",
+                "", 0, maxProgress );
+        
+        mcsProgressMonitor.setMillisToDecideToPopup(250);
+        
+        MCSTask task = new MCSTask( tableColumns, tableData );
+        task.execute();
+        //tableData = task.getTableData();
+        
+       
+        
+        String noImg = "No Image";
+        BufferedImage image = new BufferedImage( molWidth, molHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        int noImgWidth = g.getFontMetrics().stringWidth(noImg);
+        g.drawString(noImg, (molWidth - noImgWidth) / 2, molHeight / 2);
+        //cmp.printAll(g);
+        
+        // fill null values (in case of premature cancellation) for rendering
+        for( int i = 0; i < tableData.length; i++ ) {
+        	for( int j = 0; j < tableData[i].length; j++ ) {
+        		if( tableData[i][j] == null ) {
+        			tableData[i][j] = new ImageIcon(image);
+        		}
+        	}
+        }
 		
 	}
 	
@@ -392,14 +494,29 @@ public class MCSGUIFrontend extends Frame {
         //molTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer());
         //exampleTable.setPreferredScrollableViewportSize(exampleTable.getPreferredSize());
         molTable.setFillsViewportHeight(true);
-        molTable.setRowHeight(molHeight);
+        molTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);  // display horizontal scroll bar
+        //molTable.setHorizontalScrollEnabled(true);
         
+        
+        //molTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+        //molTable.setMinimumSize( new Dimension( 900, 600  ));
         
         JTableHeader header = molTable.getTableHeader();
         //header.setBackground(Color.yellow);
+        
         header.setDefaultRenderer( new IconRenderer(tC) );
         
-        molTable.setMaximumSize( new Dimension( 600, 700));
+        
+        //molTable.setPreferredSize( new Dimension( 800, 600) );
+        
+        // set row height
+        molTable.setRowHeight(molHeight);
+        
+        // set column widths
+        Iterator<TableColumn> colIterator = molTable.getColumnModel().getColumns().asIterator();
+        while( colIterator.hasNext() ) {
+        	colIterator.next().setMinWidth( molWidth );
+        }
         
         return(molTable);
 	}
@@ -479,11 +596,27 @@ public class MCSGUIFrontend extends Frame {
 	}
 	
 	
-class ExportRenderButtonListener implements ActionListener {
+	class ExportRenderButtonListener implements ActionListener {
 		
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			outputComponentImage( molPanel );
+			
+			// get the table 
+			Component c = molPanel.getViewport().getComponent(0) ;
+			int currentWidth = c.getWidth();
+			
+			// automatically set size for rendering
+			int tWidth = Math.max(
+					currentWidth, 
+					molWidth * Math.max(1, refMols.size() )
+			);
+			int tHeight = molHeight * Math.max(1, dbMols.size() );
+			
+			c.setSize( tWidth, tHeight );
+			
+			//System.out.println( c + " " + c.size() );
+			
+			outputComponentImage( c );
 		}
 		
 	}
@@ -511,6 +644,51 @@ class ExportRenderButtonListener implements ActionListener {
 		}
 		
 	}
+	
+
+	private void outputComponentImage( Component cmp ) {
+		
+		BufferedImage image = new BufferedImage(cmp.getWidth(), cmp.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        
+        cmp.printAll(g);
+        g.dispose();
+        try { 
+            ImageIO.write(image, "png", new File( exportRenderFileComponent.getText() ) ); 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        
+	}
+	
+	
+	class IconRenderer extends DefaultTableCellRenderer {
+		
+		public IconRenderer( ImageIcon[] tC ) {
+			super();
+			
+			colIcons = tC;
+		}
+		
+		  public Component getTableCellRendererComponent(JTable table, 
+		Object obj,boolean isSelected, boolean hasFocus, int row, 
+		int column) {
+		   
+		  setBorder(UIManager.getBorder("TableHeader.cellBorder"));
+		  setHorizontalAlignment(JLabel.CENTER);
+		  //System.out.println( "test " + obj.getClass() +  "  " + obj  );
+		  
+		  //setIcon( new ImageIcon("/home/edmund/git/Java_MCS_algorithms/data/output/chembl751606_aid466_decoys_r0_d0.png"));
+		  setIcon( colIcons[column] );
+		  setSize(molWidth, molHeight);
+		  setMaximumSize( new Dimension( molWidth, molHeight ) );
+		  
+		  return this;
+		}
+		  
+		ImageIcon[] colIcons;
+	}
+	
 
 
 	public MCSGUIFrontend() {
@@ -522,6 +700,8 @@ class ExportRenderButtonListener implements ActionListener {
 				null, bondWeightFlag, ghostSubstructures, algorithm, 
 				raymondHeuristics, ringHeuristics, topologicalDistanceLimit, timeLimit, false
 		);
+		
+		
 		
 		refFileComponent = new JTextField("input file path", 200);  
 		refFileButtonComponent = new JButton("Browse");
@@ -537,6 +717,19 @@ class ExportRenderButtonListener implements ActionListener {
                 100, //max
                 1);//step
 
+		mcsProgressDialog = new JDialog(this, 
+	            "Click a button",
+	            false);
+		mcsProgressDialog.setDefaultCloseOperation(
+			    JDialog.HIDE_ON_CLOSE);
+		
+		mcsProgressLabel = new JLabel("placeholder");
+		mcsProgressDialog.add( mcsProgressLabel );
+		mcsProgressDialog.pack();
+		//mcsProgressDialog.setVisible(true);
+		
+		
+		
 
 		refMolLimComponent = new JSpinner(refMolLimModel);
 		dbMolLimComponent = new JSpinner(dbMolLimModel);
@@ -608,9 +801,9 @@ class ExportRenderButtonListener implements ActionListener {
         mainPanel.setLayout(new GridBagLayout() );
         mainPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        molPanel = new JScrollPane() ;
-        molPanel.setMinimumSize( new Dimension(250, 500));
-        
+        molPanel = new JScrollPane();
+        molPanel.setMinimumSize( new Dimension(750, 500));
+
         //molPanel.setLayout(new GridBagLayout() );
         //molPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
@@ -870,53 +1063,11 @@ class ExportRenderButtonListener implements ActionListener {
         setTitle("CheMCS GUI");
 		setVisible(true);  
 		
-		outputComponentImage( molPanel );
+		//outputComponentImage( molPanel );
 		
 		
 	}
 	
-	
-	private void outputComponentImage( Component cmp ) {
-		
-		BufferedImage image = new BufferedImage(cmp.getWidth(), cmp.getHeight(), BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = image.createGraphics();
-        cmp.printAll(g);
-        g.dispose();
-        try { 
-            ImageIO.write(image, "png", new File( exportRenderFileComponent.getText() ) ); 
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        
-	}
-	
-	
-	class IconRenderer extends DefaultTableCellRenderer {
-		
-		public IconRenderer( ImageIcon[] tC ) {
-			super();
-			
-			colIcons = tC;
-		}
-		
-		  public Component getTableCellRendererComponent(JTable table, 
-		Object obj,boolean isSelected, boolean hasFocus, int row, 
-		int column) {
-		   
-		  setBorder(UIManager.getBorder("TableHeader.cellBorder"));
-		  setHorizontalAlignment(JLabel.CENTER);
-		  //System.out.println( "test " + obj.getClass() +  "  " + obj  );
-		  
-		  //setIcon( new ImageIcon("/home/edmund/git/Java_MCS_algorithms/data/output/chembl751606_aid466_decoys_r0_d0.png"));
-		  setIcon( colIcons[column] );
-		  setSize(molWidth, molHeight);
-		  setMaximumSize( new Dimension( molWidth, molHeight ) );
-		  
-		  return this;
-		}
-		  
-		ImageIcon[] colIcons;
-	}
 	
 	
 	
